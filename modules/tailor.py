@@ -37,16 +37,16 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
     SUA TAREFA:
     1. Calcule uma pontuação de aderência (match_score de 0 a 100) entre o perfil base e a vaga.
     2. Escreva uma breve justificativa para a pontuação.
-    3. Reescreva o resumo profissional destacando as tecnologias e experiências mais relevantes do perfil base.
-    4. Reordene e selecione as habilidades técnicas do perfil base mais relevantes.
+    3. Reescreva o resumo profissional (resumo_adaptado) de forma altamente personalizada para ESTA vaga específica. Destaque em 3 a 5 linhas as tecnologias, ferramentas, metodologias e experiências do perfil base que coincidem diretamente com os requisitos desta vaga, otimizando com as palavras-chave da vaga para passar em leitores ATS.
+    4. Reordene e selecione as habilidades técnicas do perfil base mais relevantes para essa vaga.
     5. Escreva uma CARTA DE APRESENTAÇÃO profissional (cover_letter) curta, direta e convincente (máximo 3 parágrafos) em 1ª pessoa, pronta para ser enviada no corpo do e-mail ao recrutador.
-    6. REGRA RÍGIDA: NUNCA invente habilidades ou experiências que não estejam no perfil base.
+    6. REGRA RÍGIDA: NUNCA invente habilidades, empresas ou experiências que não estejam no perfil base.
 
     RETORNE ESTRITAMENTE UM JSON NO SEGUINTE FORMATO (Sem markdown em volta ou texto extra):
     {{
         "match_score": 85,
         "justificativa_match": "Explicação em uma frase",
-        "resumo_adaptado": "Resumo profissional otimizado",
+        "resumo_adaptado": "Resumo profissional totalmente customizado e otimizado com palavras-chave desta vaga específica",
         "habilidades_destacadas": ["Skill 1", "Skill 2", "Skill 3"],
         "cover_letter": "Texto completo da carta de apresentação para o recrutador"
     }}
