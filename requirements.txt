@@ -1,0 +1,7 @@
+groq
+supabase
+reportlab
+python-dotenv
+requests
+beautifulsoup4
+google-search-results
