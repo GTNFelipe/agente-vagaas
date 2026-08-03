@@ -2,7 +2,7 @@ name: Executar Agente de Vagas
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Roda a cada 6 horas
+    - cron: '0 11,17,23 * * *'  # Roda às 08:00, 14:00 e 20:00 (Horário de Brasília / UTC-3)
   workflow_dispatch:       # Permite execução manual via botão no GitHub
 
 jobs:
