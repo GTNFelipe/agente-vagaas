@@ -312,15 +312,18 @@ TERMOS_EXCLUSIVOS_GRUPO_REGEX = [
     r'\bpara\s+elas\b',
 
     # Exclusivas / Afirmativas para PCD
+    r'\bpcd\b',
     r'\bexclusiva\b.*?\bpcd\b',
     r'\bafirmativa\b.*?\bpcd\b',
     r'\bexclusivo\b.*?\bpcd\b',
     r'\bsomente\b.*?\bpcd\b',
     r'\bapenas\b.*?\bpcd\b',
     r'\bvaga\s+pcd\b',
+    r'\bvagas?\s+pcd\b',
     r'\bvagas?\s+exclusivas?\s+para\s+pcd\b',
     r'\bvagas?\s+afirmativas?\s+para\s+pcd\b',
-    r'\bexclusiva\s+para\s+pesso[as]\s+com\s+defici[êe]ncia\b'
+    r'\bexclusiva\s+para\s+pesso[as]\s+com\s+defici[êe]ncia\b',
+    r'\bpesso[as]\s+com\s+defici[êe]ncia\b'
 ]
 
 def eh_vaga_publico_geral(vaga: dict) -> bool:
@@ -330,6 +333,11 @@ def eh_vaga_publico_geral(vaga: dict) -> bool:
     titulo = str(vaga.get("titulo", "")).lower()
     descricao = str(vaga.get("descricao", "")).lower()
     texto_completo = f"{titulo} {descricao}"
+
+    # Bloqueio imediato se a marcação PCD ou Mulheres estiver presente no título da vaga
+    if re.search(r'\bpcd\b', titulo, re.IGNORECASE):
+        print(f"[FILTRO PCD] Vaga descartada por ser direcionada a PCD (marcação no título): '{vaga.get('titulo')}'")
+        return False
 
     for p_excl in TERMOS_EXCLUSIVOS_GRUPO_REGEX:
         if re.search(p_excl, texto_completo, re.IGNORECASE):
