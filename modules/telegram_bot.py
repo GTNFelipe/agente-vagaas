@@ -109,6 +109,48 @@ def comando_buscar(chat_id: str):
     except Exception as e:
         enviar_mensagem_telegram(chat_id, f"❌ <b>[ERRO NA BUSCA]</b> Falha ao executar varredura: {e}")
 
+def gerar_relatorio_diario_telegram() -> str:
+    """Gera o resumo diário de desempenho (Daily Digest) consultando o Supabase e a SerpAPI."""
+    supabase = inicializar_supabase()
+    if not supabase:
+        return "⚠️ <b>Erro:</b> Supabase indisponível para relatório diário."
+
+    from datetime import datetime
+    hoje_inicio = datetime.now().strftime("%Y-%m-%d 00:00:00")
+
+    try:
+        # Busca vagas processadas hoje
+        res_proc = supabase.table("vagas_processadas").select("id, status_candidatura, created_at").gte("created_at", hoje_inicio).execute()
+        proc_hoje = res_proc.data or []
+        total_proc_hoje = len(proc_hoje)
+        auto_applies_hoje = sum(1 for item in proc_hoje if item.get("status_candidatura") == "candidatado_auto")
+
+        # Busca vagas qualificadas hoje
+        res_vagas = supabase.table("vagas").select("id, created_at").gte("created_at", hoje_inicio).execute()
+        qualificadas_hoje = len(res_vagas.data or [])
+
+        # Consulta SerpAPI
+        info_serp = consultar_uso_serpapi()
+        usadas = info_serp.get("usadas", "N/A")
+        restantes = info_serp.get("restantes", "N/A")
+        limite = info_serp.get("limite", 250)
+
+        mensagem = f"""📊 <b>[RESUMO DIÁRIO DO AGENTE DE VAGAS]</b>
+📅 <b>Data:</b> {datetime.now().strftime('%d/%m/%Y')}
+
+🔍 <b>Vagas Analisadas Hoje:</b> {total_proc_hoje}
+🎯 <b>Vagas Qualificadas Hoje (Match >= 80%):</b> {qualificadas_hoje}
+🤖 <b>Candidaturas Automáticas (Auto-Applies):</b> {auto_applies_hoje}
+
+💳 <b>[COTA SERPAPI AO VIVO]</b>
+• <b>Pesquisas Usadas Este Mês:</b> {usadas} / {limite}
+• <b>Pesquisas Restantes:</b> {restantes}
+
+🟢 <i>O robô continuará as varreduras diárias normalmente amanhã a partir das 08:00!</i>"""
+        return mensagem
+    except Exception as e:
+        return f"⚠️ <b>Erro ao gerar relatório diário:</b> {e}"
+
 def processar_mensagem(update: dict):
     """Processa mensagens e comandos recebidos do Telegram."""
     message = update.get("message", {})
@@ -124,7 +166,8 @@ def processar_mensagem(update: dict):
         ajuda_texto = """🤖 <b>[MENU DO AGENTE DE VAGAS]</b>
 
 Comandos disponíveis:
-📊 /status - Exibe estatísticas de vagas e candidaturas.
+📊 /status - Exibe estatísticas de vagas e cota ao vivo.
+📅 /relatorio - Exibe o resumo de desempenho do dia de hoje (Daily Digest).
 ⚡ /buscar - Dispara uma busca de vagas imediatamente.
 ❓ /ajuda - Exibe este menu de ajuda."""
         enviar_mensagem_telegram(chat_id, ajuda_texto)
@@ -132,6 +175,10 @@ Comandos disponíveis:
     elif text == "/status":
         status_msg = comando_status()
         enviar_mensagem_telegram(chat_id, status_msg)
+
+    elif text == "/relatorio":
+        rel_msg = gerar_relatorio_diario_telegram()
+        enviar_mensagem_telegram(chat_id, rel_msg)
 
     elif text == "/buscar":
         comando_buscar(chat_id)

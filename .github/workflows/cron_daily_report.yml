@@ -1,0 +1,33 @@
+name: Relatorio Diario Telegram (Daily Digest)
+
+on:
+  schedule:
+    - cron: '0 23 * * *'  # Roda todo dia às 20:00 (Horário de Brasília / 23:00 UTC)
+  workflow_dispatch:
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repositório
+        uses: actions/checkout@v3
+
+      - name: Configurar Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Instalar Dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Disparar Relatório Diário no Telegram
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python -c "from modules.telegram_bot import gerar_relatorio_diario_telegram, enviar_mensagem_telegram, TELEGRAM_CHAT_ID; enviar_mensagem_telegram(TELEGRAM_CHAT_ID, gerar_relatorio_diario_telegram())"
