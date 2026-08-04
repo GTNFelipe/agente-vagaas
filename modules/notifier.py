@@ -1,4 +1,6 @@
 import os
+import re
+import html
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -77,20 +79,24 @@ def enviar_notificacao_telegram(vaga_info: dict, analise_ia: dict, caminho_pdf: 
     emoji_status = "🤖 [AUTO-APPLY]" if modo_candidatura == "auto" else "🎯 [NOVA VAGA QUALIFICADA]"
     
     dossie_info = analise_ia.get("dossie_entrevista", {})
-    pitch = dossie_info.get("pitch_elevador", "")
-    carta = analise_ia.get("cover_letter", "")
+    pitch = html.escape(str(dossie_info.get("pitch_elevador", "")))
+    carta = html.escape(str(analise_ia.get("cover_letter", "")))
     link_vaga = vaga_info.get("link", "#")
+    empresa = html.escape(str(vaga_info.get('empresa', '')))
+    titulo = html.escape(str(vaga_info.get('titulo', '')))
+    justificativa = html.escape(str(analise_ia.get('justificativa_match', '')))
+    resumo_adaptado = html.escape(str(analise_ia.get('resumo_adaptado', '')))
 
     mensagem = f"""<b>{emoji_status} Match: {match_score}%</b>
 
-🏢 <b>Empresa:</b> {vaga_info.get('empresa')}
-💼 <b>Cargo:</b> {vaga_info.get('titulo')}
+🏢 <b>Empresa:</b> {empresa}
+💼 <b>Cargo:</b> {titulo}
 
 💡 <b>Justificativa:</b>
-<i>{analise_ia.get('justificativa_match')}</i>
+<i>{justificativa}</i>
 
 📝 <b>Resumo Otimizado:</b>
-<i>{analise_ia.get('resumo_adaptado')}</i>
+<i>{resumo_adaptado}</i>
 
 ───────────────
 🎙️ <b>Pitch de 1 Minuto:</b>
