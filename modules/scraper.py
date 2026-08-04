@@ -346,6 +346,42 @@ def eh_vaga_publico_geral(vaga: dict) -> bool:
 
     return True
 
+def buscar_vagas_programathor() -> list:
+    """
+    Busca vagas tech abertas diretamente no portal Programathor (sem consumo de cota SerpAPI).
+    """
+    vagas = []
+    url = "https://programathor.com.br/jobs"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, "html.parser")
+            containers = soup.find_all("div", class_=lambda c: c and "cell-list" in c)
+
+            for c in containers:
+                a_tag = c.find("a", href=True)
+                if a_tag:
+                    link = "https://programathor.com.br" + a_tag["href"]
+                    h3 = c.find("h3")
+                    titulo = h3.get_text().strip() if h3 else "Vaga Dev"
+                    spans = c.find_all("span")
+                    empresa = spans[0].get_text().strip() if spans else "Programathor Tech"
+                    vagas.append({
+                        "titulo": titulo,
+                        "empresa": empresa,
+                        "link": link,
+                        "descricao": f"{titulo} na empresa {empresa}. Vaga publica no Programathor.",
+                        "fonte": "Programathor"
+                    })
+    except Exception as e:
+        print(f"[AVISO PROGRAMATHOR] Erro ao buscar vagas no Programathor: {e}")
+
+    return vagas
+
 def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     """
     Executa a varredura em 1 ÚNICA pesquisa unificada na SerpAPI por execução do bot,
@@ -362,7 +398,11 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
 
     print("[BUSCA FEEDS] Varrendo RSS Feeds de vagas (Gratuito / Sem consumo de cota)...")
     vagas_rss = buscar_vagas_rss_feed()
-    todas_coletadas = todas_vagas + vagas_rss
+
+    print("[BUSCA PROGRAMATHOR] Varrendo portal Programathor (Gratuito / Sem consumo de cota)...")
+    vagas_programathor = buscar_vagas_programathor()
+
+    todas_coletadas = todas_vagas + vagas_rss + vagas_programathor
 
     vagas_filtradas = []
     
