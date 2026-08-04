@@ -39,7 +39,8 @@ def buscar_vagas_google_jobs(query: str, localizacao: str = "Brazil") -> list:
 
         for job in jobs_results:
             apply_options = job.get("apply_options", [])
-            link_vaga = apply_options[0].get("link") if apply_options else job.get("share_link", "")
+            default_link = job.get("share_link", "")
+            link_vaga = escolher_melhor_link_gratuito(apply_options, default_link)
 
             vagas_encontradas.append({
                 "titulo": job.get("title"),
@@ -81,42 +82,50 @@ def buscar_vagas_rss_feed() -> list:
 
     return vagas
 
-SITES_PAGOS_BLOQUEADOS = [
-    "bebee.com",
-    "i9empregos.com.br",
-    "empregoses.com.br",
-    "empregos.com.br",
-    "catho.com.br",
-    "manager.com.br",
-    "trabalho.org",
-    "whatjobs.com",
-    "buscojobs.com"
-]
+def escolher_melhor_link_gratuito(apply_options: list, default_link: str) -> str:
+    """
+    Dada a lista de opções de candidatura do Google Jobs, escolhe prioritariamente 
+    links diretos e gratuitos (Gupy, LinkedIn, Glassdoor, site da empresa, etc.) 
+    em vez de redirecionadores agregadores.
+    """
+    if not apply_options:
+        return default_link
 
-def eh_plataforma_gratuita(vaga: dict) -> bool:
+    preferenciais = ["gupy.io", "linkedin.com", "glassdoor", "smartrecruiters", "greenhouse.io", "lever.co", "workable", "solides.jobs", "programathor"]
+    
+    for opt in apply_options:
+        link_opt = str(opt.get("link", "")).lower()
+        title_opt = str(opt.get("title", "")).lower()
+        for pref in preferenciais:
+            if pref in link_opt or pref in title_opt:
+                return opt.get("link")
+
+    return apply_options[0].get("link", default_link)
+
+def eh_candidatura_gratuita(vaga: dict) -> bool:
     """
-    Verifica se a vaga provém de uma plataforma 100% gratuita para o candidato.
-    Bloqueia sites que cobram assinaturas/planos pagos (ex: Bebee, Empregos.com, Catho, i9Empregos, Trabajo.org).
+    Verifica se a candidatura para esta vaga específica é 100% gratuita.
+    Permite anúncios de qualquer site (Bebee, Empregos, Catho, etc.), descartando APENAS 
+    anúncios específicos que exijam assinatura paga, plano VIP ou pagamento para enviar o currículo.
     """
-    link = str(vaga.get("link", "")).lower()
-    titulo = str(vaga.get("titulo", "")).lower()
-    empresa = str(vaga.get("empresa", "")).lower()
     descricao = str(vaga.get("descricao", "")).lower()
-    texto_completo = f"{link} {titulo} {empresa} {descricao}"
+    titulo = str(vaga.get("titulo", "")).lower()
+    texto_completo = f"{titulo} {descricao}"
 
-    # 1. Checa a lista de sites pagos/agregadores com paywall
-    for site_pago in SITES_PAGOS_BLOQUEADOS:
-        if site_pago in link:
-            print(f"[FILTRO PLATAFORMA PAGA] Vaga descartada por requerer plano/pagamento ({site_pago}): '{vaga.get('titulo')}'")
-            return False
-
-    # 2. Checa se o texto da página ou anúncio menciona termos de cobrança
-    termos_pago = [
-        "assinar plano", "plano premium", "candidatura paga", "membro vip", "assinatura paga"
+    padroes_paywall = [
+        r'assine\b.*?\bpara\s+(se\s+)?candidatar\b',
+        r'vaga\s+exclusiva\s+para\s+assinantes\b',
+        r'membros?\s+premium\b',
+        r'plano\s+vip\b',
+        r'assinatura\s+paga\b',
+        r'fa[cç]a\s+um\s+plano\s+para\b',
+        r'candidatura\s+paga\b',
+        r'pague\s+para\s+candidatar\b'
     ]
-    for tp in termos_pago:
-        if tp in texto_completo:
-            print(f"[FILTRO PLATAFORMA PAGA] Vaga descartada por termos de cobrança: '{vaga.get('titulo')}'")
+
+    for padrao in padroes_paywall:
+        if re.search(padrao, texto_completo, re.IGNORECASE):
+            print(f"[FILTRO CANDIDATURA PAGA] Vaga descartada por conter cobrança específica: '{vaga.get('titulo')}'")
             return False
 
     return True
@@ -147,7 +156,7 @@ def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
 def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     """
     Executa a varredura em todas as fontes configuradas para os cargos alvo definidos,
-    filtrando EXCLUSIVAMENTE por vagas gratuitas e Remotas ou Híbridas no Rio de Janeiro.
+    filtrando EXCLUSIVAMENTE por candidaturas gratuitas e vagas Remotas ou Híbridas no Rio de Janeiro.
     """
     todas_vagas = []
     
@@ -167,13 +176,13 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     for vaga in todas_coletadas:
         texto = f"{vaga.get('titulo', '')} {vaga.get('descricao', '')}".lower()
         if re.search(padrao_relevancia, texto, re.IGNORECASE):
-            if eh_plataforma_gratuita(vaga):
+            if eh_candidatura_gratuita(vaga):
                 if eh_vaga_remota_ou_rj(vaga):
                     vagas_filtradas.append(vaga)
                 else:
                     print(f"[FILTRO LOCALIDADE] Vaga descartada (Presencial/Híbrida fora do RJ): '{vaga.get('titulo')}'")
 
-    print(f"[SUCESSO] Total de vagas filtradas (Gratuitas, Remoto/RJ): {len(vagas_filtradas)}")
+    print(f"[SUCESSO] Total de vagas filtradas (Candidaturas Gratuitas, Remoto/RJ): {len(vagas_filtradas)}")
     return vagas_filtradas
 
 def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
