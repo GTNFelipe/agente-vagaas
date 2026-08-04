@@ -137,6 +137,57 @@ def eh_candidatura_gratuita(vaga: dict) -> bool:
 
     return True
 
+PAISES_ESTRANGEIROS_BLOQUEADOS = [
+    r'\bunited\s+states\b', r'\busa?\b(?!\s*a\b)', r'\bcanada\b', r'\bgermany\b', r'\balemanha\b',
+    r'\bunited\s+kingdom\b', r'\buk\b', r'\bportugal\b', r'\blisboa\b', r'\bporto\b',
+    r'\bspain\b', r'\bespanha\b', r'\bmadrid\b', r'\bnetherlands\b', r'\bamsterdam\b',
+    r'\bpoland\b', r'\bpolonia\b', r'\bindia\b', r'\baustralia\b'
+]
+
+def eh_vaga_no_brasil(vaga: dict) -> bool:
+    """
+    Garante que a vaga seja localizada no Brasil (mesmo que o título ou descrição estejam em inglês).
+    Bloqueia vagas internacionais que exigem moradia/relocação fora do Brasil (EUA, Europa, Canadá, etc.).
+    """
+    link = str(vaga.get("link", "")).lower()
+    titulo = str(vaga.get("titulo", "")).lower()
+    empresa = str(vaga.get("empresa", "")).lower()
+    descricao = str(vaga.get("descricao", "")).lower()
+    texto_completo = f"{link} {titulo} {empresa} {descricao}"
+
+    # 1. Se contiver indicação explícita de Brasil / RJ / LATAM Brazil / Remoto Brasil, aprova!
+    marcas_brasil = [
+        r'\bbrasil\b', r'\bbrazil\b', r'\brj\b', r'\brio\s*de\s*janeiro\b',
+        r'\bremoto\s*brasil\b', r'\bremote\s*\(\s*brazil\s*\)\b', r'\blatam\s*\(\s*brazil\s*\)\b',
+        r'\blatam\b', r'\bsouth\s*america\b', r'\bamérica\s*latina\b'
+    ]
+    for mb in marcas_brasil:
+        if re.search(mb, texto_completo, re.IGNORECASE):
+            return True
+
+    # 2. Se exigir relocalização externa ou moradia/autorização em outro país, rejeita
+    termos_exclusao_exterior = [
+        r'relocat(e|ion)\s+to',
+        r'must\s+be\s+located\s+in\s+the\s+u\.?s\.?',
+        r'us\s+work\s+authorization',
+        r'must\s+reside\s+in\s+europe',
+        r'eu\s+work\s+permit',
+        r'presencial\s+em\s+portugal',
+        r'presencial\s+em\s+madrid'
+    ]
+    for te in termos_exclusao_exterior:
+        if re.search(te, texto_completo, re.IGNORECASE):
+            print(f"[FILTRO INTERNACIONAL] Vaga descartada por exigir relocalização no exterior: '{vaga.get('titulo')}'")
+            return False
+
+    # 3. Se mencionar país estrangeiro sem ter menção a Brasil / LATAM
+    for pe in PAISES_ESTRANGEIROS_BLOQUEADOS:
+        if re.search(pe, texto_completo, re.IGNORECASE):
+            print(f"[FILTRO INTERNACIONAL] Vaga descartada por localização no exterior ({pe}): '{vaga.get('titulo')}'")
+            return False
+
+    return True
+
 def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
     """
     Verifica se a vaga possui modalidade Remota ou é Híbrida/Presencial localizada no Rio de Janeiro (RJ).
@@ -163,12 +214,12 @@ def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
 def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     """
     Executa a varredura em todas as fontes configuradas para os cargos alvo definidos,
-    filtrando EXCLUSIVAMENTE por candidaturas gratuitas e vagas Remotas ou Híbridas no Rio de Janeiro.
+    filtrando EXCLUSIVAMENTE por vagas no Brasil, candidaturas gratuitas e Remotas/RJ.
     """
     todas_vagas = []
     
     for cargo in cargos_alvo:
-        query_busca = f"{cargo} (remoto OR 'rio de janeiro')"
+        query_busca = f"{cargo} Brasil (remoto OR 'rio de janeiro')"
         print(f"[BUSCA] Varrendo a web por: '{query_busca}'...")
         vagas_google = buscar_vagas_google_jobs(query=query_busca)
         todas_vagas.extend(vagas_google)
@@ -184,12 +235,15 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
         texto = f"{vaga.get('titulo', '')} {vaga.get('descricao', '')}".lower()
         if re.search(padrao_relevancia, texto, re.IGNORECASE):
             if eh_candidatura_gratuita(vaga):
-                if eh_vaga_remota_ou_rj(vaga):
-                    vagas_filtradas.append(vaga)
+                if eh_vaga_no_brasil(vaga):
+                    if eh_vaga_remota_ou_rj(vaga):
+                        vagas_filtradas.append(vaga)
+                    else:
+                        print(f"[FILTRO LOCALIDADE] Vaga descartada (Presencial/Híbrida fora do RJ): '{vaga.get('titulo')}'")
                 else:
-                    print(f"[FILTRO LOCALIDADE] Vaga descartada (Presencial/Híbrida fora do RJ): '{vaga.get('titulo')}'")
+                    print(f"[FILTRO PAÍS] Vaga descartada por ser localizada fora do Brasil: '{vaga.get('titulo')}'")
 
-    print(f"[SUCESSO] Total de vagas filtradas (Candidaturas Gratuitas, Remoto/RJ): {len(vagas_filtradas)}")
+    print(f"[SUCESSO] Total de vagas filtradas (Brasil, Gratuitas, Remoto/RJ): {len(vagas_filtradas)}")
     return vagas_filtradas
 
 def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
