@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import time
 from dotenv import load_dotenv
 
 from modules.scraper import coletar_vagas_todas_fontes
@@ -74,6 +75,8 @@ def main():
         else:
             print(f"[INFO] Vaga descartada (Score {match_score}% < 80%).")
             salvar_vaga_processada(supabase_client, vaga, analise, status_candidatura="descartado")
+
+        time.sleep(4)
 
     print("\n[SUCESSO] Execucao completa finalizada com sucesso!")
 
