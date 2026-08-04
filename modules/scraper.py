@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from bs4 import BeautifulSoup
 
@@ -82,18 +83,25 @@ def buscar_vagas_rss_feed() -> list:
 
 def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     """
-    Executa a varredura em todas as fontes configuradas.
+    Executa a varredura em todas as fontes configuradas para os cargos alvo definidos.
     """
     todas_vagas = []
     
-    for cargo in cargos_alvo[:2]:
+    for cargo in cargos_alvo:
         print(f"[BUSCA] Varrendo a web por: '{cargo}'...")
         vagas_google = buscar_vagas_google_jobs(query=cargo)
         todas_vagas.extend(vagas_google)
 
     print("[BUSCA] Varrendo feeds RSS de vagas...")
     vagas_rss = buscar_vagas_rss_feed()
-    todas_vagas.extend(vagas_rss)
+    
+    vagas_rss_filtradas = []
+    padrao_relevancia = r'\bcobol\b|\bmainframe\b|\bjava\b(?!\s*script)|\bn8n\b|\bautoma[cç][aã]o\b|\banalista\b'
+    for vaga in vagas_rss:
+        texto = f"{vaga.get('titulo', '')} {vaga.get('descricao', '')}".lower()
+        if re.search(padrao_relevancia, texto, re.IGNORECASE):
+            vagas_rss_filtradas.append(vaga)
 
-    print(f"[SUCESSO] Total de vagas coletadas na varredura: {len(todas_vagas)}")
-    return todas_vagas
+    vagas_finais = todas_vagas + vagas_rss_filtradas
+    print(f"[SUCESSO] Total de vagas coletadas (filtradas por relevancia): {len(vagas_finais)}")
+    return vagas_finais

@@ -24,7 +24,7 @@ def main():
     print("[INICIO] Executando Agente de Vagas & Candidatura Autonoma (Fase 3)...")
     
     perfil_base = carregar_perfil_base()
-    cargos_alvo = perfil_base.get("cargos_alvo", ["Desenvolvedor Backend Python Junior"])
+    cargos_alvo = perfil_base.get("cargos_alvo", ["Desenvolvedor COBOL", "Desenvolvedor Java Junior"])
     supabase_client = inicializar_supabase()
 
     # 1. Coleta Vagas na Web
