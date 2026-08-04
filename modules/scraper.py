@@ -262,10 +262,48 @@ def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
     # Por padrão, permite vagas que não sejam presenciais em outros estados
     return True
 
+TERMOS_EXCLUSIVOS_GRUPO_REGEX = [
+    # Exclusivas / Afirmativas para Mulheres
+    r'\bexclusiva\b.*?\bmulheres\b',
+    r'\bafirmativa\b.*?\bmulheres\b',
+    r'\bexclusivo\b.*?\bmulheres\b',
+    r'\bsomente\b.*?\bmulheres\b',
+    r'\bapenas\b.*?\bmulheres\b',
+    r'\bvaga\s+para\s+mulheres\b',
+    r'\bmulheres\s+na\s+tech\b',
+    r'\bvaga\s+feminina\b',
+
+    # Exclusivas / Afirmativas para PCD
+    r'\bexclusiva\b.*?\bpcd\b',
+    r'\bafirmativa\b.*?\bpcd\b',
+    r'\bexclusivo\b.*?\bpcd\b',
+    r'\bsomente\b.*?\bpcd\b',
+    r'\bapenas\b.*?\bpcd\b',
+    r'\bvaga\s+pcd\b',
+    r'\bvagas?\s+exclusivas?\s+para\s+pcd\b',
+    r'\bvagas?\s+afirmativas?\s+para\s+pcd\b',
+    r'\bexclusiva\s+para\s+pesso[as]\s+com\s+defici[êe]ncia\b'
+]
+
+def eh_vaga_publico_geral(vaga: dict) -> bool:
+    """
+    Descarte anúncios de vagas afirmativas ou exclusivas para públicos específicos (ex: exclusivas para mulheres ou exclusivas para PCD).
+    """
+    titulo = str(vaga.get("titulo", "")).lower()
+    descricao = str(vaga.get("descricao", "")).lower()
+    texto_completo = f"{titulo} {descricao}"
+
+    for p_excl in TERMOS_EXCLUSIVOS_GRUPO_REGEX:
+        if re.search(p_excl, texto_completo, re.IGNORECASE):
+            print(f"[FILTRO AFIRMATIVO EXCLUSIVO] Vaga descartada por ser exclusiva/afirmativa para público específico: '{vaga.get('titulo')}'")
+            return False
+
+    return True
+
 def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     """
     Executa a varredura em todas as fontes configuradas para os cargos alvo definidos,
-    filtrando EXCLUSIVAMENTE por vagas no Brasil, candidaturas gratuitas e Remotas/RJ.
+    filtrando EXCLUSIVAMENTE por vagas no Brasil, públicas/gerais, candidaturas gratuitas e Remotas/RJ.
     """
     todas_vagas = []
     
@@ -283,14 +321,15 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     
     for vaga in todas_coletadas:
         if eh_cargo_e_nivel_permitido(vaga):
-            if eh_candidatura_gratuita(vaga):
-                if eh_vaga_no_brasil(vaga):
-                    if eh_vaga_remota_ou_rj(vaga):
-                        vagas_filtradas.append(vaga)
+            if eh_vaga_publico_geral(vaga):
+                if eh_candidatura_gratuita(vaga):
+                    if eh_vaga_no_brasil(vaga):
+                        if eh_vaga_remota_ou_rj(vaga):
+                            vagas_filtradas.append(vaga)
+                        else:
+                            print(f"[FILTRO LOCALIDADE] Vaga descartada (Presencial/Híbrida fora do RJ): '{vaga.get('titulo')}'")
                     else:
-                        print(f"[FILTRO LOCALIDADE] Vaga descartada (Presencial/Híbrida fora do RJ): '{vaga.get('titulo')}'")
-                else:
-                    print(f"[FILTRO PAÍS] Vaga descartada por ser localizada fora do Brasil: '{vaga.get('titulo')}'")
+                        print(f"[FILTRO PAÍS] Vaga descartada por ser localizada fora do Brasil: '{vaga.get('titulo')}'")
 
     print(f"[SUCESSO] Total de vagas filtradas (Brasil, Gratuitas, Remoto/RJ): {len(vagas_filtradas)}")
     return vagas_filtradas
