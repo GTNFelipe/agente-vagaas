@@ -382,6 +382,43 @@ def buscar_vagas_programathor() -> list:
 
     return vagas
 
+def buscar_vagas_github_repos() -> list:
+    """
+    Busca vagas em tempo real nos repositórios/fóruns de comunidades tech do GitHub (backend-br/vagas e soujava/vagas).
+    Não consome cota do SerpAPI!
+    """
+    vagas_github = []
+    repos = ["backend-br/vagas", "soujava/vagas"]
+    headers = {
+        "User-Agent": "AgenteVagasBot",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    for repo in repos:
+        try:
+            url = f"https://api.github.com/repos/{repo}/issues?state=open&per_page=15"
+            resp = requests.get(url, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                issues = resp.json()
+                for issue in issues:
+                    if "pull_request" in issue:
+                        continue
+
+                    titulo = issue.get("title", "Vaga Dev")
+                    body = issue.get("body", "") or titulo
+
+                    vagas_github.append({
+                        "titulo": titulo,
+                        "empresa": f"Comunidade GitHub ({repo.split('/')[0]})",
+                        "link": issue.get("html_url"),
+                        "descricao": body,
+                        "fonte": f"GitHub Fórum ({repo})"
+                    })
+        except Exception as e:
+            print(f"[AVISO GITHUB REPOS] Erro ao buscar vagas no repositório '{repo}': {e}")
+
+    return vagas_github
+
 def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     """
     Executa a varredura em 1 ÚNICA pesquisa unificada na SerpAPI por execução do bot,
@@ -402,7 +439,10 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     print("[BUSCA PROGRAMATHOR] Varrendo portal Programathor (Gratuito / Sem consumo de cota)...")
     vagas_programathor = buscar_vagas_programathor()
 
-    todas_coletadas = todas_vagas + vagas_rss + vagas_programathor
+    print("[BUSCA FORUNS TECH] Varrendo fóruns de comunidade no GitHub (backend-br e soujava)...")
+    vagas_github_forums = buscar_vagas_github_repos()
+
+    todas_coletadas = todas_vagas + vagas_rss + vagas_programathor + vagas_github_forums
 
     vagas_filtradas = []
     
