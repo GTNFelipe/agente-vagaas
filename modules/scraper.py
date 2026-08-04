@@ -105,27 +105,34 @@ def escolher_melhor_link_gratuito(apply_options: list, default_link: str) -> str
 def eh_candidatura_gratuita(vaga: dict) -> bool:
     """
     Verifica se a candidatura para esta vaga específica é 100% gratuita.
-    Permite anúncios de qualquer site (Bebee, Empregos, Catho, etc.), descartando APENAS 
-    anúncios específicos que exijam assinatura paga, plano VIP ou pagamento para enviar o currículo.
+    Descarte anúncios específicos que exijam assinatura paga, plano VIP ou pagamento para enviar o currículo.
     """
+    link = str(vaga.get("link", "")).lower()
     descricao = str(vaga.get("descricao", "")).lower()
     titulo = str(vaga.get("titulo", "")).lower()
-    texto_completo = f"{titulo} {descricao}"
+    empresa = str(vaga.get("empresa", "")).lower()
+    texto_completo = f"{link} {titulo} {empresa} {descricao}"
 
     padroes_paywall = [
         r'assine\b.*?\bpara\s+(se\s+)?candidatar\b',
         r'vaga\s+exclusiva\s+para\s+assinantes\b',
         r'membros?\s+premium\b',
         r'plano\s+vip\b',
+        r'seja\s+vip\b',
+        r'torne-se\s+vip\b',
+        r'\bvaga\s+vip\b',
+        r'\bárea\s+vip\b',
         r'assinatura\s+paga\b',
         r'fa[cç]a\s+um\s+plano\s+para\b',
         r'candidatura\s+paga\b',
-        r'pague\s+para\s+candidatar\b'
+        r'pague\s+para\s+candidatar\b',
+        r'empresa\s+confidencial\b.*?\bvip\b',
+        r'trabalhaes\.com\.br'
     ]
 
     for padrao in padroes_paywall:
         if re.search(padrao, texto_completo, re.IGNORECASE):
-            print(f"[FILTRO CANDIDATURA PAGA] Vaga descartada por conter cobrança específica: '{vaga.get('titulo')}'")
+            print(f"[FILTRO CANDIDATURA PAGA] Vaga descartada por requerer assinatura VIP/Pagamento: '{vaga.get('titulo')}'")
             return False
 
     return True
@@ -187,9 +194,9 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
 
 def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
     """
-    Verifica em tempo real se a vaga no link informado continua ativa e aceitando candidaturas.
+    Verifica em tempo real se a vaga no link informado continua ativa e aceitando candidaturas gratuitas.
     Retorna False se o link retornar HTTP >= 400, redirecionar para página inicial genérica,
-    ou contiver palavras-chave de encerramento ('vaga encerrada', 'job closed', etc.).
+    contiver palavras-chave de encerramento ('vaga encerrada') ou exigir plano VIP/pago.
     """
     if not url or not str(url).startswith("http"):
         return False
@@ -215,6 +222,7 @@ def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
         soup = BeautifulSoup(response.content, "html.parser")
         texto_pagina = soup.get_text().lower()
 
+        # 1. Validação de encerramento
         expressoes_encerramento = [
             "vaga encerrada",
             "vaga finalizada",
@@ -241,6 +249,23 @@ def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
         for expr in expressoes_encerramento:
             if expr in texto_pagina:
                 print(f"[VALIDAÇÃO] Vaga encerrada detectada ('{expr}'): {url}")
+                return False
+
+        # 2. Validação de Paywall / VIP na página ao vivo
+        expressoes_paywall = [
+            "seja vip",
+            "torne-se vip",
+            "empresa confidencial (torne-se vip",
+            "assine para se candidatar",
+            "exclusivo para assinantes",
+            "membro premium",
+            "plano vip",
+            "candidatura paga"
+        ]
+
+        for pw in expressoes_paywall:
+            if pw in texto_pagina:
+                print(f"[VALIDAÇÃO PAYWALL] Vaga descartada por exigir plano VIP/Pagamento ('{pw}'): {url}")
                 return False
 
         return True

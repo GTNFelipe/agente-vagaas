@@ -82,17 +82,24 @@ def vaga_ja_processada(supabase: Optional[Client], vaga_or_link: Any) -> bool:
         if norm_titulo and norm_titulo == item_titulo and (not norm_empresa or norm_empresa == "portal remotar / web"):
             return True
 
-    # 2. Checar no Supabase
+    # 2. Checar no Supabase (vagas_processadas e vagas)
     if supabase:
         try:
             if link:
-                res_link = supabase.table("vagas_processadas").select("id").eq("link_vaga", link).execute()
+                clean_link = link.split("?")[0].rstrip("/")
+                res_link = supabase.table("vagas_processadas").select("id").ilike("link_vaga", f"%{clean_link}%").execute()
                 if res_link.data and len(res_link.data) > 0:
                     return True
 
-            if titulo and empresa:
-                res_te = supabase.table("vagas_processadas").select("id").eq("titulo_vaga", titulo).eq("empresa", empresa).execute()
-                if res_te.data and len(res_te.data) > 0:
+            if titulo:
+                # Checa por título exato (insensível a maiúsculas/minúsculas) em vagas_processadas
+                res_title = supabase.table("vagas_processadas").select("id").ilike("titulo_vaga", titulo.strip()).execute()
+                if res_title.data and len(res_title.data) > 0:
+                    return True
+
+                # Checa por título na tabela vagas base
+                res_vagas = supabase.table("vagas").select("id").ilike("titulo", titulo.strip()).execute()
+                if res_vagas.data and len(res_vagas.data) > 0:
                     return True
         except Exception as e:
             print(f"[AVISO] Erro ao verificar duplicata no Supabase: {e}")
