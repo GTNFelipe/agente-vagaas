@@ -64,12 +64,12 @@ def main():
         print(f"[SCORE] Score de Match: {match_score}%")
 
         if match_score >= 80:
-            clean_title = re.sub(r'[^\w\-_]', '_', str(titulo)).strip("_")
+            clean_empresa = re.sub(r'[^\w\-_]', '_', str(vaga.get("empresa", "Empresa"))).strip("_")
             
             # 1. Gerar e SALVAR o PDF do Currículo Otimizado em pasta dedicada
             pasta_cvs = "curriculos_gerados"
             os.makedirs(pasta_cvs, exist_ok=True)
-            nome_arquivo_pdf = f"CV_Felipe_Santana_{clean_title}_{match_score}.pdf"
+            nome_arquivo_pdf = f"CV_Felipe_Santana_{clean_empresa}.pdf"
             caminho_pdf = os.path.join(pasta_cvs, nome_arquivo_pdf)
             gerar_pdf_curriculo(perfil_base, analise, output_filename=caminho_pdf)
 

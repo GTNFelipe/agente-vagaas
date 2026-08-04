@@ -45,8 +45,8 @@ def realizar_candidatura_auto_email(vaga_info: dict, analise_ia: dict, caminho_p
     if caminho_pdf and os.path.exists(caminho_pdf):
         with open(caminho_pdf, "rb") as f:
             pdf_attachment = MIMEApplication(f.read(), _subtype="pdf")
-            clean_title = str(vaga_info.get('titulo', 'Vaga')).replace(' ', '_').replace('/', '_')
-            filename = f"CV_Felipe_Santana_{clean_title}.pdf"
+            clean_empresa = re.sub(r'[^\w\-_]', '_', str(vaga_info.get('empresa', 'Empresa'))).strip("_")
+            filename = f"CV_Felipe_Santana_{clean_empresa}.pdf"
             pdf_attachment.add_header('Content-Disposition', 'attachment', filename=filename)
             msg.attach(pdf_attachment)
 
