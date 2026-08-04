@@ -137,6 +137,58 @@ def eh_candidatura_gratuita(vaga: dict) -> bool:
 
     return True
 
+CARGOS_EXCLUIDOS_REGEX = [
+    r'\bcloud\b', r'\bdevops\b', r'\bsre\b',
+    r'\bdados\b', r'\bdata\b', r'\bbi\b', r'\bbusiness\s+intelligence\b',
+    r'\bsuporte\b', r'\bhelpdesk\b', r'\bservice\s*desk\b', r'\bn1\b', r'\bn2\b', r'\bn3\b'
+]
+
+SENIORIDADE_EXCLUIDA_REGEX = [
+    r'\bs[eê]nior\b', r'\bsr\.?\b', r'\bsnr\b',
+    r'\bpleno\b', r'\bpl\.?\b', r'\bmid\s*-?\s*level\b',
+    r'\blead\b', r'\bl[ií]der\b', r'\bcoordenador\b', r'\bgerente\b', r'\bmanager\b',
+    r'\bhead\b', r'\bdiretor\b', r'\barquitet[oa]\b', r'\barchitect\b', r'\bespecialista\b', r'\bspecialist\b'
+]
+
+def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
+    """
+    Filtra estritamente os cargos aceitos (COBOL, Mainframe, Analista de Sistemas, Java, Automação/n8n)
+    exclusivamente no nível JÚNIOR / TRAINEE.
+    Descarte imediato para: Cloud, DevOps, SRE, Analista de Dados, Analista de Suporte e vagas de nível Pleno/Sênior/Lead/Especialista.
+    """
+    titulo = str(vaga.get("titulo", "")).lower()
+    descricao = str(vaga.get("descricao", "")).lower()
+    texto_completo = f"{titulo} {descricao}"
+
+    # 1. Descarte imediato se contiver áreas excluídas (Cloud, DevOps, SRE, Dados, Suporte) no título
+    for area in CARGOS_EXCLUIDOS_REGEX:
+        if re.search(area, titulo, re.IGNORECASE):
+            print(f"[FILTRO ÁREA EXCLUÍDA] Vaga descartada por ser de área não desejada ({area}): '{vaga.get('titulo')}'")
+            return False
+
+    # 2. Descarte imediato se contiver senioridade elevada (Sênior, Pleno, Lead, Especialista, Gerente) no título
+    for sen in SENIORIDADE_EXCLUIDA_REGEX:
+        if re.search(sen, titulo, re.IGNORECASE):
+            print(f"[FILTRO SENIORIDADE] Vaga descartada por ser de nível Pleno/Sênior/Lead ({sen}): '{vaga.get('titulo')}'")
+            return False
+
+    # 3. Validação de Cargos Permitidos (COBOL, Mainframe, Analista de Sistemas, Java, Automação/n8n)
+    cargos_validos = [
+        r'\bcobol\b',
+        r'\bmainframe\b',
+        r'\banalista\s+de\s+sistemas\b',
+        r'\bjava\b(?!\s*script)',
+        r'\bn8n\b',
+        r'\bautoma[cç][aã]o\b'
+    ]
+
+    tem_cargo_valido = any(re.search(cv, texto_completo, re.IGNORECASE) for cv in cargos_validos)
+    if not tem_cargo_valido:
+        print(f"[FILTRO CARGO] Vaga descartada por não ser COBOL, Mainframe, Analista de Sistemas, Java ou Automação: '{vaga.get('titulo')}'")
+        return False
+
+    return True
+
 PAISES_ESTRANGEIROS_BLOQUEADOS = [
     r'\bunited\s+states\b', r'\busa?\b(?!\s*a\b)', r'\bcanada\b', r'\bgermany\b', r'\balemanha\b',
     r'\bunited\s+kingdom\b', r'\buk\b', r'\bportugal\b', r'\blisboa\b', r'\bporto\b',
@@ -229,11 +281,9 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     todas_coletadas = todas_vagas + vagas_rss
 
     vagas_filtradas = []
-    padrao_relevancia = r'\bcobol\b|\bmainframe\b|\bjava\b(?!\s*script)|\bn8n\b|\bautoma[cç][aã]o\b|\banalista\b'
     
     for vaga in todas_coletadas:
-        texto = f"{vaga.get('titulo', '')} {vaga.get('descricao', '')}".lower()
-        if re.search(padrao_relevancia, texto, re.IGNORECASE):
+        if eh_cargo_e_nivel_permitido(vaga):
             if eh_candidatura_gratuita(vaga):
                 if eh_vaga_no_brasil(vaga):
                     if eh_vaga_remota_ou_rj(vaga):
