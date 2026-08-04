@@ -39,8 +39,28 @@ def enviar_mensagem_telegram(chat_id: str, texto: str):
     except Exception as e:
         print(f"[ERRO TELEGRAM] Falha ao enviar mensagem: {e}")
 
+def consultar_uso_serpapi() -> dict:
+    """Consulta os dados reais de uso da API SerpAPI diretamente na API oficial."""
+    api_key = os.getenv("SERPAPI_KEY")
+    if not api_key:
+        return {}
+    try:
+        url = f"https://serpapi.com/account?api_key={api_key}"
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            return {
+                "usadas": data.get("this_month_usage", 0),
+                "restantes": data.get("total_searches_left", 0),
+                "limite": data.get("searches_per_month", 250),
+                "renovacao": data.get("plan_renewal_date", "N/A")
+            }
+    except Exception as e:
+        print(f"[ERRO SERPAPI ACCOUNT] {e}")
+    return {}
+
 def comando_status() -> str:
-    """Gera o relatório de status consultando o Supabase."""
+    """Gera o relatório de status consultando o Supabase e a API do SerpAPI ao vivo."""
     supabase = inicializar_supabase()
     if not supabase:
         return "⚠️ <b>Erro:</b> Supabase não configurado ou indisponível."
@@ -57,12 +77,23 @@ def comando_status() -> str:
         # Conta auto-applies efetuados
         auto_applies = sum(1 for item in (res_proc.data or []) if item.get("status_candidatura") == "candidatado_auto")
 
+        # Consulta métricas da cota da SerpAPI em tempo real pela API oficial
+        info_serp = consultar_uso_serpapi()
+        usadas = info_serp.get("usadas", "N/A")
+        restantes = info_serp.get("restantes", "N/A")
+        limite = info_serp.get("limite", 250)
+        renovacao = info_serp.get("renovacao", "N/A")
+
         mensagem = f"""📊 <b>[STATUS DO AGENTE DE VAGAS]</b>
 
 🔍 <b>Vagas Analisadas:</b> {total_proc}
 🎯 <b>Vagas Qualificadas (Match >= 80%):</b> {total_qual}
 🤖 <b>Auto-Applies Efetuados:</b> {auto_applies}
-💳 <b>Consumo Estimado SerpAPI:</b> 1 busca/rodada
+
+💳 <b>[COTA SERPAPI AO VIVO]</b>
+• <b>Pesquisas Usadas Este Mês:</b> {usadas} / {limite}
+• <b>Pesquisas Restantes:</b> {restantes}
+• <b>Data de Renovação:</b> {renovacao}
 
 🟢 <i>O robô está rodando ativamente 8 vezes ao dia (08h às 22h).</i>"""
         return mensagem
