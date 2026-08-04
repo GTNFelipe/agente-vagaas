@@ -81,6 +81,46 @@ def buscar_vagas_rss_feed() -> list:
 
     return vagas
 
+SITES_PAGOS_BLOQUEADOS = [
+    "bebee.com",
+    "i9empregos.com.br",
+    "empregoses.com.br",
+    "empregos.com.br",
+    "catho.com.br",
+    "manager.com.br",
+    "trabalho.org",
+    "whatjobs.com",
+    "buscojobs.com"
+]
+
+def eh_plataforma_gratuita(vaga: dict) -> bool:
+    """
+    Verifica se a vaga provém de uma plataforma 100% gratuita para o candidato.
+    Bloqueia sites que cobram assinaturas/planos pagos (ex: Bebee, Empregos.com, Catho, i9Empregos, Trabajo.org).
+    """
+    link = str(vaga.get("link", "")).lower()
+    titulo = str(vaga.get("titulo", "")).lower()
+    empresa = str(vaga.get("empresa", "")).lower()
+    descricao = str(vaga.get("descricao", "")).lower()
+    texto_completo = f"{link} {titulo} {empresa} {descricao}"
+
+    # 1. Checa a lista de sites pagos/agregadores com paywall
+    for site_pago in SITES_PAGOS_BLOQUEADOS:
+        if site_pago in link:
+            print(f"[FILTRO PLATAFORMA PAGA] Vaga descartada por requerer plano/pagamento ({site_pago}): '{vaga.get('titulo')}'")
+            return False
+
+    # 2. Checa se o texto da página ou anúncio menciona termos de cobrança
+    termos_pago = [
+        "assinar plano", "plano premium", "candidatura paga", "membro vip", "assinatura paga"
+    ]
+    for tp in termos_pago:
+        if tp in texto_completo:
+            print(f"[FILTRO PLATAFORMA PAGA] Vaga descartada por termos de cobrança: '{vaga.get('titulo')}'")
+            return False
+
+    return True
+
 def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
     """
     Verifica se a vaga possui modalidade Remota ou é Híbrida/Presencial localizada no Rio de Janeiro (RJ).
@@ -107,7 +147,7 @@ def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
 def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     """
     Executa a varredura em todas as fontes configuradas para os cargos alvo definidos,
-    filtrando EXCLUSIVAMENTE por vagas Remotas ou Híbridas no Rio de Janeiro.
+    filtrando EXCLUSIVAMENTE por vagas gratuitas e Remotas ou Híbridas no Rio de Janeiro.
     """
     todas_vagas = []
     
@@ -127,12 +167,13 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     for vaga in todas_coletadas:
         texto = f"{vaga.get('titulo', '')} {vaga.get('descricao', '')}".lower()
         if re.search(padrao_relevancia, texto, re.IGNORECASE):
-            if eh_vaga_remota_ou_rj(vaga):
-                vagas_filtradas.append(vaga)
-            else:
-                print(f"[FILTRO LOCALIDADE] Vaga descartada (Presencial/Híbrida fora do RJ): '{vaga.get('titulo')}'")
+            if eh_plataforma_gratuita(vaga):
+                if eh_vaga_remota_ou_rj(vaga):
+                    vagas_filtradas.append(vaga)
+                else:
+                    print(f"[FILTRO LOCALIDADE] Vaga descartada (Presencial/Híbrida fora do RJ): '{vaga.get('titulo')}'")
 
-    print(f"[SUCESSO] Total de vagas filtradas (Remoto ou RJ): {len(vagas_filtradas)}")
+    print(f"[SUCESSO] Total de vagas filtradas (Gratuitas, Remoto/RJ): {len(vagas_filtradas)}")
     return vagas_filtradas
 
 def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
