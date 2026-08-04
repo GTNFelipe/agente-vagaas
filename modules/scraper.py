@@ -81,30 +81,59 @@ def buscar_vagas_rss_feed() -> list:
 
     return vagas
 
+def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
+    """
+    Verifica se a vaga possui modalidade Remota ou é Híbrida/Presencial localizada no Rio de Janeiro (RJ).
+    Descarta vagas presenciais ou híbridas em outros estados/cidades (SP, MG, PR, etc.).
+    """
+    texto = f"{vaga.get('titulo', '')} {vaga.get('empresa', '')} {vaga.get('descricao', '')}".lower()
+
+    # 1. Modalidade Remota / Home Office / Remote
+    if re.search(r'\b(remoto|remota|remote|home\s*office|teletrabalho|100%\s*remoto|work\s*from\s*home|anywhere)\b', texto):
+        return True
+
+    # 2. Localização no Rio de Janeiro (RJ)
+    if re.search(r'\b(rio\s*de\s*janeiro|rj|barra\s*da\s*tijuca|centro\s*-\s*rj|botafogo|niter[oó]i|tijuca)\b', texto):
+        return True
+
+    # 3. Se mencionar explicitamente presencial/híbrido em outras regiões e NÃO tiver marcação de Remoto/RJ
+    outras_regioes = r'\b(s[aã]o\s*paulo|sp|belo\s*horizonte|mg|curitiba|pr|porto\s*alegre|rs|florian[oó]polis|sc|bras[íi]lia|df|campinas)\b'
+    if re.search(outras_regioes, texto):
+        return False
+
+    # Por padrão, permite vagas que não sejam presenciais em outros estados
+    return True
+
 def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     """
-    Executa a varredura em todas as fontes configuradas para os cargos alvo definidos.
+    Executa a varredura em todas as fontes configuradas para os cargos alvo definidos,
+    filtrando EXCLUSIVAMENTE por vagas Remotas ou Híbridas no Rio de Janeiro.
     """
     todas_vagas = []
     
     for cargo in cargos_alvo:
-        print(f"[BUSCA] Varrendo a web por: '{cargo}'...")
-        vagas_google = buscar_vagas_google_jobs(query=cargo)
+        query_busca = f"{cargo} (remoto OR 'rio de janeiro')"
+        print(f"[BUSCA] Varrendo a web por: '{query_busca}'...")
+        vagas_google = buscar_vagas_google_jobs(query=query_busca)
         todas_vagas.extend(vagas_google)
 
     print("[BUSCA] Varrendo feeds RSS de vagas...")
     vagas_rss = buscar_vagas_rss_feed()
-    
-    vagas_rss_filtradas = []
+    todas_coletadas = todas_vagas + vagas_rss
+
+    vagas_filtradas = []
     padrao_relevancia = r'\bcobol\b|\bmainframe\b|\bjava\b(?!\s*script)|\bn8n\b|\bautoma[cç][aã]o\b|\banalista\b'
-    for vaga in vagas_rss:
+    
+    for vaga in todas_coletadas:
         texto = f"{vaga.get('titulo', '')} {vaga.get('descricao', '')}".lower()
         if re.search(padrao_relevancia, texto, re.IGNORECASE):
-            vagas_rss_filtradas.append(vaga)
+            if eh_vaga_remota_ou_rj(vaga):
+                vagas_filtradas.append(vaga)
+            else:
+                print(f"[FILTRO LOCALIDADE] Vaga descartada (Presencial/Híbrida fora do RJ): '{vaga.get('titulo')}'")
 
-    vagas_finais = todas_vagas + vagas_rss_filtradas
-    print(f"[SUCESSO] Total de vagas coletadas (filtradas por relevancia): {len(vagas_finais)}")
-    return vagas_finais
+    print(f"[SUCESSO] Total de vagas filtradas (Remoto ou RJ): {len(vagas_filtradas)}")
+    return vagas_filtradas
 
 def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
     """
