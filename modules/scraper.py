@@ -138,9 +138,19 @@ def eh_candidatura_gratuita(vaga: dict) -> bool:
     return True
 
 CARGOS_EXCLUIDOS_REGEX = [
+    # Infra, Cloud, DevOps, SRE, Dados, Suporte, Redes, Segurança
     r'\bcloud\b', r'\bdevops\b', r'\bsre\b',
     r'\bdados\b', r'\bdata\b', r'\bbi\b', r'\bbusiness\s+intelligence\b',
-    r'\bsuporte\b', r'\bhelpdesk\b', r'\bservice\s*desk\b', r'\bn1\b', r'\bn2\b', r'\bn3\b'
+    r'\bsuporte\b', r'\bhelpdesk\b', r'\bservice\s*desk\b', r'\bn1\b', r'\bn2\b', r'\bn3\b',
+    r'\binfraestrutura\b', r'\binfra\b', r'\bredes\b', r'\bt[eé]cnico\b', r'\binfosec\b', r'\bsoc\b',
+
+    # Ensino, Docência e Treinamento (Ex: Professor(a) de Automação)
+    r'\bprofessor[a]?\b', r'\bdocente\b', r'\binstrutor[a]?\b', r'\btutor[a]?\b', r'\btreinador[a]?\b',
+
+    # Vendas, Comercial, Gestão de Produtos/Projetos, Design
+    r'\bcomercial\b', r'\bvendas\b', r'\bvendedor[a]?\b', r'\bsdr\b', r'\bbdr\b',
+    r'\bscrum\s*master\b', r'\bagile\s*coach\b', r'\bproduct\s*owner\b', r'\bproduct\s*manager\b',
+    r'\bdesigner\b', r'\bux\b', r'\bui\b'
 ]
 
 SENIORIDADE_ALTA_REGEX = [
@@ -151,19 +161,19 @@ SENIORIDADE_ALTA_REGEX = [
 
 def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
     """
-    Filtra estritamente os cargos aceitos:
+    Filtra estritamente para garantir que a vaga seja de Desenvolvedor ou Analista de Sistemas/Automação:
     - COBOL, Mainframe, Analista de Sistemas e Java: APENAS nível JÚNIOR / TRAINEE.
     - Automação / n8n: Nível JÚNIOR, TRAINEE ou PLENO.
-    Descarte para: Cloud, DevOps, SRE, Analista de Dados, Analista de Suporte e vagas de nível Sênior/Lead/Especialista.
+    Descarte para: Professor/Docente, Vendas/Comercial, Scrum Master/PO/PM, Design/UX, Cloud, DevOps, SRE, Dados, Suporte e nível Sênior/Lead.
     """
     titulo = str(vaga.get("titulo", "")).lower()
     descricao = str(vaga.get("descricao", "")).lower()
     texto_completo = f"{titulo} {descricao}"
 
-    # 1. Descarte imediato se contiver áreas excluídas (Cloud, DevOps, SRE, Dados, Suporte) no título
+    # 1. Descarte imediato de áreas/funções não desejadas no título (Ensino, Vendas, Cloud, DevOps, SRE, Dados, Suporte)
     for area in CARGOS_EXCLUIDOS_REGEX:
         if re.search(area, titulo, re.IGNORECASE):
-            print(f"[FILTRO ÁREA EXCLUÍDA] Vaga descartada por ser de área não desejada ({area}): '{vaga.get('titulo')}'")
+            print(f"[FILTRO ÁREA EXCLUÍDA] Vaga descartada por ser de área/função não desejada ({area}): '{vaga.get('titulo')}'")
             return False
 
     # 2. Descarte imediato de senioridade alta (Sênior, Lead, Gerente, Especialista, Architect)
@@ -172,15 +182,28 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
             print(f"[FILTRO SENIORIDADE ALTA] Vaga descartada por ser de nível Sênior/Lead ({sen}): '{vaga.get('titulo')}'")
             return False
 
-    # 3. Identifica se a vaga é de Automação / n8n ou de outros cargos válidos
+    # 3. Validação de Título: Deve se enquadrar como Desenvolvedor/Programador/Engenheiro de Software ou Analista de Sistemas/Automação
+    padroes_titulo_dev_analista = [
+        r'\bdesenvolvedor[a]?\b', r'\bdeveloper\b', r'\bprogramador[a]?\b', r'\bprogrammer\b',
+        r'\bsoftware\s+engineer\b', r'\bengenheiro[a]?\s+de\s+software\b',
+        r'\banalista\s+de\s+sistemas\b', r'\banalista\s+de\s+automa[cç][aã]o\b',
+        r'\banalista\s+n8n\b', r'\banalista\s+de\s+desenvolvimento\b', r'\banalista\s+backend\b'
+    ]
+
+    tem_titulo_dev_analista = any(re.search(ptd, titulo, re.IGNORECASE) for ptd in padroes_titulo_dev_analista)
+    if not tem_titulo_dev_analista:
+        print(f"[FILTRO TITULO DEVIANTE] Vaga descartada por fugir do perfil de Desenvolvedor / Analista de Sistemas: '{vaga.get('titulo')}'")
+        return False
+
+    # 4. Identifica se a vaga é de Automação / n8n ou de outros cargos válidos (COBOL, Mainframe, Java, Analista de Sistemas)
     eh_automacao = bool(re.search(r'\b(n8n|automa[cç][aã]o)\b', texto_completo, re.IGNORECASE))
     eh_outros_cargos_validos = bool(re.search(r'\b(cobol|mainframe|analista\s+de\s+sistemas|java(?!\s*script))\b', texto_completo, re.IGNORECASE))
 
     if not eh_automacao and not eh_outros_cargos_validos:
-        print(f"[FILTRO CARGO] Vaga descartada por não ser COBOL, Mainframe, Analista de Sistemas, Java ou Automação: '{vaga.get('titulo')}'")
+        print(f"[FILTRO CARGO] Vaga descartada por não conter COBOL, Mainframe, Analista de Sistemas, Java ou Automação: '{vaga.get('titulo')}'")
         return False
 
-    # 4. Checagem de Nível Pleno: Permitido APENAS se for vaga de Automação / n8n
+    # 5. Checagem de Nível Pleno: Permitido APENAS se for vaga de Automação / n8n
     eh_pleno = bool(re.search(r'\b(pleno|pl\.?|mid\s*-?\s*level)\b', titulo, re.IGNORECASE))
     if eh_pleno and not eh_automacao:
         print(f"[FILTRO SENIORIDADE] Vaga de Pleno descartada (permitida apenas para Automação/n8n): '{vaga.get('titulo')}'")
