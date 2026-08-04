@@ -106,12 +106,18 @@ def eh_candidatura_gratuita(vaga: dict) -> bool:
     """
     Verifica se a candidatura para esta vaga específica é 100% gratuita.
     Descarte anúncios específicos que exijam assinatura paga, plano VIP ou pagamento para enviar o currículo.
+    Bloqueia 100% das vagas do portal Bebee conforme solicitação explícita do usuário.
     """
     link = str(vaga.get("link", "")).lower()
     descricao = str(vaga.get("descricao", "")).lower()
     titulo = str(vaga.get("titulo", "")).lower()
     empresa = str(vaga.get("empresa", "")).lower()
     texto_completo = f"{link} {titulo} {empresa} {descricao}"
+
+    # Bloqueio explícito do Bebee
+    if "bebee.com" in link:
+        print(f"[FILTRO BEBEE] Vaga descartada por ser do portal Bebee: '{vaga.get('titulo')}'")
+        return False
 
     padroes_paywall = [
         r'assine\b.*?\bpara\s+(se\s+)?candidatar\b',
@@ -127,7 +133,8 @@ def eh_candidatura_gratuita(vaga: dict) -> bool:
         r'candidatura\s+paga\b',
         r'pague\s+para\s+candidatar\b',
         r'empresa\s+confidencial\b.*?\bvip\b',
-        r'trabalhaes\.com\.br'
+        r'trabalhaes\.com\.br',
+        r'bebee\.com'
     ]
 
     for padrao in padroes_paywall:
