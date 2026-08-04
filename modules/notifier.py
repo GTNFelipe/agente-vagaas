@@ -120,11 +120,16 @@ def enviar_notificacao_telegram(vaga_info: dict, analise_ia: dict, caminho_pdf: 
     try:
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
-            print("📱 Notificação enviada para o Telegram com sucesso!")
+            print("[TELEGRAM] Notificacao enviada para o Telegram com sucesso!")
         else:
-            print(f"❌ Erro ao enviar para o Telegram: {response.text}")
+            resp_data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+            desc = resp_data.get("description", response.text)
+            if "chat not found" in desc.lower():
+                print(f"[ERRO TELEGRAM] Chat nao encontrado para o ID '{chat_id}'. ATENCAO: Voce precisa abrir a conversa com o seu Bot no Telegram e clicar em 'COMEÇAR' (/start) para autorizar o bot a enviar mensagens!")
+            else:
+                print(f"[ERRO TELEGRAM] Falha ao enviar mensagem: {desc}")
     except Exception as e:
-        print(f"❌ Falha de conexão com a API do Telegram: {e}")
+        print(f"[ERRO TELEGRAM] Falha de conexao com a API do Telegram: {e}")
 
     # Envia os documentos (PDF, Dossiê MD, Carta TXT) para o Telegram
     for fpath in [caminho_pdf, caminho_dossie, caminho_carta]:
@@ -134,9 +139,9 @@ def enviar_notificacao_telegram(vaga_info: dict, analise_ia: dict, caminho_pdf: 
                     files = {"document": (os.path.basename(fpath), doc_file)}
                     data = {"chat_id": chat_id}
                     requests.post(doc_url, data=data, files=files, timeout=15)
-                print(f"📎 Anexo '{os.path.basename(fpath)}' enviado para o Telegram!")
+                print(f"[TELEGRAM] Anexo '{os.path.basename(fpath)}' enviado para o Telegram!")
             except Exception as e:
-                print(f"❌ Erro ao enviar anexo '{fpath}' para o Telegram: {e}")
+                print(f"[ERRO TELEGRAM] Erro ao enviar anexo '{fpath}' para o Telegram: {e}")
 
     return True
 
