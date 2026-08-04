@@ -1,0 +1,125 @@
+import os
+import sys
+import time
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Adiciona o diretório raiz ao PYTHONPATH para permitir importações dos módulos
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from modules.database import inicializar_supabase
+import main
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+
+def enviar_mensagem_telegram(chat_id: str, texto: str):
+    """Envia mensagem formatada em HTML para o chat do Telegram."""
+    if not TELEGRAM_TOKEN or not chat_id:
+        return
+    url = f"{API_URL}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": texto,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
+    }
+    try:
+        requests.post(url, json=payload, timeout=10)
+    except Exception as e:
+        print(f"[ERRO TELEGRAM] Falha ao enviar mensagem: {e}")
+
+def comando_status() -> str:
+    """Gera o relatório de status consultando o Supabase."""
+    supabase = inicializar_supabase()
+    if not supabase:
+        return "⚠️ <b>Erro:</b> Supabase não configurado ou indisponível."
+
+    try:
+        # Busca total de vagas processadas
+        res_proc = supabase.table("vagas_processadas").select("id, status_candidatura", count="exact").execute()
+        total_proc = res_proc.count if res_proc.count is not None else len(res_proc.data or [])
+
+        # Busca total de vagas qualificadas
+        res_vagas = supabase.table("vagas").select("id", count="exact").execute()
+        total_qual = res_vagas.count if res_vagas.count is not None else len(res_vagas.data or [])
+
+        # Conta auto-applies efetuados
+        auto_applies = sum(1 for item in (res_proc.data or []) if item.get("status_candidatura") == "candidatado_auto")
+
+        mensagem = f"""📊 <b>[STATUS DO AGENTE DE VAGAS]</b>
+
+🔍 <b>Vagas Analisadas:</b> {total_proc}
+🎯 <b>Vagas Qualificadas (Match >= 80%):</b> {total_qual}
+🤖 <b>Auto-Applies Efetuados:</b> {auto_applies}
+💳 <b>Consumo Estimado SerpAPI:</b> 1 busca/rodada
+
+🟢 <i>O robô está rodando ativamente 8 vezes ao dia (08h às 22h).</i>"""
+        return mensagem
+    except Exception as e:
+        return f"⚠️ <b>Erro ao obter status:</b> {e}"
+
+def comando_buscar(chat_id: str):
+    """Executa a busca de vagas em tempo real e notifica o Telegram."""
+    enviar_mensagem_telegram(chat_id, "⚡ <b>[BUSCA INICIADA]</b> Varrendo a web por novas vagas agora... Aguarde alguns instantes!")
+    try:
+        main.main()
+        enviar_mensagem_telegram(chat_id, "✅ <b>[BUSCA CONCLUÍDA]</b> Varredura finalizada com sucesso! Se houverem novas vagas qualificadas, elas já foram enviadas acima.")
+    except Exception as e:
+        enviar_mensagem_telegram(chat_id, f"❌ <b>[ERRO NA BUSCA]</b> Falha ao executar varredura: {e}")
+
+def processar_mensagem(update: dict):
+    """Processa mensagens e comandos recebidos do Telegram."""
+    message = update.get("message", {})
+    text = message.get("text", "").strip()
+    chat_id = str(message.get("chat", {}).get("id", ""))
+
+    # Valida se a mensagem veio do seu chat autorizado
+    if chat_id != str(TELEGRAM_CHAT_ID):
+        print(f"[BOT SECURITY] Mensagem ignorada de chat não autorizado: {chat_id}")
+        return
+
+    if text in ["/start", "/ajuda", "/help"]:
+        ajuda_texto = """🤖 <b>[MENU DO AGENTE DE VAGAS]</b>
+
+Comandos disponíveis:
+📊 /status - Exibe estatísticas de vagas e candidaturas.
+⚡ /buscar - Dispara uma busca de vagas imediatamente.
+❓ /ajuda - Exibe este menu de ajuda."""
+        enviar_mensagem_telegram(chat_id, ajuda_texto)
+
+    elif text == "/status":
+        status_msg = comando_status()
+        enviar_mensagem_telegram(chat_id, status_msg)
+
+    elif text == "/buscar":
+        comando_buscar(chat_id)
+
+def escutar_comandos():
+    """Inicia o loop de escuta de comandos do Telegram via Long Polling."""
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        print("[BOT TELEGRAM] TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não definidos.")
+        return
+
+    print("🤖 [BOT TELEGRAM INTERATIVO] Escutando comandos... (Pressione Ctrl+C para parar)")
+    offset = 0
+
+    while True:
+        try:
+            url = f"{API_URL}/getUpdates?offset={offset}&timeout=20"
+            resp = requests.get(url, timeout=25)
+            if resp.status_code == 200:
+                data = resp.json()
+                for update in data.get("result", []):
+                    offset = update["update_id"] + 1
+                    processar_mensagem(update)
+            time.sleep(1)
+        except Exception as e:
+            print(f"[ERRO BOT TELEGRAM] {e}")
+            time.sleep(5)
+
+if __name__ == "__main__":
+    escutar_comandos()
