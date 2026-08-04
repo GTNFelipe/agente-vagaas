@@ -3,6 +3,7 @@ import json
 import re
 from datetime import datetime
 from typing import Optional, Any
+from dotenv import load_dotenv
 
 try:
     from supabase import create_client, Client
