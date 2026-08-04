@@ -1,11 +1,16 @@
 import os
-from typing import Optional
+import json
+import re
+from datetime import datetime
+from typing import Optional, Any
 
 try:
     from supabase import create_client, Client
 except ImportError:
     Client = None
     create_client = None
+
+LOCAL_DB_FILE = "vagas_processadas.json"
 
 def inicializar_supabase() -> Optional[Client]:
     url = os.getenv("SUPABASE_URL")
@@ -17,25 +22,84 @@ def inicializar_supabase() -> Optional[Client]:
     except Exception:
         return None
 
-def vaga_ja_processada(supabase: Optional[Client], link_vaga: str) -> bool:
-    """
-    Verifica no Supabase se o link da vaga já foi analisado anteriormente.
-    """
-    if not supabase or not link_vaga:
-        return False
+def _carregar_vagas_locais() -> list:
+    if os.path.exists(LOCAL_DB_FILE):
+        try:
+            with open(LOCAL_DB_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
 
+def _salvar_vagas_locais(vagas: list):
     try:
-        res = supabase.table("vagas_processadas").select("id").eq("link_vaga", link_vaga).execute()
-        return len(res.data) > 0
+        with open(LOCAL_DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(vagas, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"[AVISO] Erro ao verificar duplicata no Supabase: {e}")
-        return False
+        print(f"[AVISO] Nao foi possivel salvar cache local de vagas: {e}")
+
+def _normalizar_string(s: str) -> str:
+    if not s:
+        return ""
+    s = s.lower().strip()
+    return re.sub(r'\s+', ' ', s)
+
+def _normalizar_url(url: str) -> str:
+    if not url:
+        return ""
+    url = url.split("?")[0].rstrip("/")
+    return url.lower().strip()
+
+def vaga_ja_processada(supabase: Optional[Client], vaga_or_link: Any) -> bool:
+    """
+    Verifica se a vaga já foi registrada ou candidatada anteriormente.
+    Consulta tanto o arquivo local (vagas_processadas.json) quanto o Supabase.
+    """
+    if isinstance(vaga_or_link, dict):
+        link = vaga_or_link.get("link", "") or ""
+        titulo = vaga_or_link.get("titulo", "") or ""
+        empresa = vaga_or_link.get("empresa", "") or ""
+    else:
+        link = str(vaga_or_link) if vaga_or_link else ""
+        titulo = ""
+        empresa = ""
+
+    norm_link = _normalizar_url(link)
+    norm_titulo = _normalizar_string(titulo)
+    norm_empresa = _normalizar_string(empresa)
+
+    # 1. Checar no cache local (vagas_processadas.json)
+    vagas_locais = _carregar_vagas_locais()
+    for item in vagas_locais:
+        item_link = _normalizar_url(item.get("link_vaga") or item.get("link", ""))
+        item_titulo = _normalizar_string(item.get("titulo_vaga") or item.get("titulo", ""))
+        item_empresa = _normalizar_string(item.get("empresa", ""))
+
+        if norm_link and item_link and norm_link == item_link:
+            return True
+        if norm_titulo and norm_empresa and norm_titulo == item_titulo and norm_empresa == item_empresa:
+            return True
+        if norm_titulo and norm_titulo == item_titulo and (not norm_empresa or norm_empresa == "portal remotar / web"):
+            return True
+
+    # 2. Checar no Supabase
+    if supabase:
+        try:
+            if link:
+                res_link = supabase.table("vagas_processadas").select("id").eq("link_vaga", link).execute()
+                if res_link.data and len(res_link.data) > 0:
+                    return True
+
+            if titulo and empresa:
+                res_te = supabase.table("vagas_processadas").select("id").eq("titulo_vaga", titulo).eq("empresa", empresa).execute()
+                if res_te.data and len(res_te.data) > 0:
+                    return True
+        except Exception as e:
+            print(f"[AVISO] Erro ao verificar duplicata no Supabase: {e}")
+
+    return False
 
 def salvar_vaga_processada(supabase: Optional[Client], vaga_data: dict, analise_ia: dict, status_candidatura: str = "alerta_manual"):
-    if not supabase:
-        print("[AVISO] Supabase nao configurado. Ignorando persistencia em banco.")
-        return
-
     registro = {
         "titulo_vaga": vaga_data.get("titulo"),
         "empresa": vaga_data.get("empresa"),
@@ -43,14 +107,38 @@ def salvar_vaga_processada(supabase: Optional[Client], vaga_data: dict, analise_
         "match_score": analise_ia.get("match_score"),
         "justificativa": analise_ia.get("justificativa_match"),
         "resumo_adaptado": analise_ia.get("resumo_adaptado"),
-        "status_candidatura": status_candidatura
+        "status_candidatura": status_candidatura,
+        "criado_em": datetime.now().isoformat()
     }
 
-    try:
-        supabase.table("vagas_processadas").insert(registro).execute()
-        print(f"[SUCESSO] Vaga '{vaga_data.get('titulo')}' salva no Supabase (Status: {status_candidatura})!")
-    except Exception as e:
-        print(f"[ERRO] Erro ao salvar no Supabase: {e}")
+    # 1. Salvar no cache local
+    vagas_locais = _carregar_vagas_locais()
+    link_reg = _normalizar_url(registro.get("link_vaga", ""))
+    tit_reg = _normalizar_string(registro.get("titulo_vaga", ""))
+    emp_reg = _normalizar_string(registro.get("empresa", ""))
+
+    ja_existe_local = False
+    for v in vagas_locais:
+        v_link = _normalizar_url(v.get("link_vaga", ""))
+        v_tit = _normalizar_string(v.get("titulo_vaga", ""))
+        v_emp = _normalizar_string(v.get("empresa", ""))
+        if (link_reg and v_link == link_reg) or (tit_reg and emp_reg and v_tit == tit_reg and v_emp == emp_reg):
+            ja_existe_local = True
+            break
+
+    if not ja_existe_local:
+        vagas_locais.append(registro)
+        _salvar_vagas_locais(vagas_locais)
+
+    # 2. Salvar no Supabase
+    if supabase:
+        try:
+            supabase.table("vagas_processadas").insert(registro).execute()
+            print(f"[SUCESSO] Vaga '{vaga_data.get('titulo')}' salva no Supabase (Status: {status_candidatura})!")
+        except Exception as e:
+            print(f"[ERRO] Erro ao salvar no Supabase: {e}")
+    else:
+        print(f"[INFO] Vaga '{vaga_data.get('titulo')}' salva no cache local 'vagas_processadas.json' (Status: {status_candidatura}).")
 
 # Aliases para compatibilidade
 get_supabase_client = inicializar_supabase

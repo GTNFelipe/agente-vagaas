@@ -39,8 +39,8 @@ def main():
         link = vaga.get("link")
         titulo = vaga.get("titulo")
 
-        if supabase_client and vaga_ja_processada(supabase_client, link):
-            print(f"[SKIP] Vaga ja registrada: '{titulo}'. Pulando...")
+        if vaga_ja_processada(supabase_client, vaga):
+            print(f"[SKIP] Vaga ja registrada/candidatada: '{titulo}' ({vaga.get('empresa')}). Pulando...")
             continue
 
         print(f"\n[VAGA] Analisando: {titulo} - {vaga.get('empresa')}")
@@ -76,7 +76,7 @@ def main():
             print(f"[INFO] Vaga descartada (Score {match_score}% < 80%).")
             salvar_vaga_processada(supabase_client, vaga, analise, status_candidatura="descartado")
 
-        time.sleep(4)
+        time.sleep(20)
 
     print("\n[SUCESSO] Execucao completa finalizada com sucesso!")
 

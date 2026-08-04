@@ -1,12 +1,14 @@
 import os
 import json
 import logging
+import time
 from typing import Dict, Any
 
 try:
-    from groq import Groq
+    from groq import Groq, RateLimitError
 except ImportError:
     Groq = None
+    RateLimitError = Exception
 
 logger = logging.getLogger(__name__)
 
@@ -52,14 +54,27 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
     }}
     """
 
-    response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.2,
-        response_format={"type": "json_object"}
-    )
+    max_tentativas = 3
+    tempo_espera = 15
 
-    return json.loads(response.choices[0].message.content)
+    for tentativa in range(1, max_tentativas + 1):
+        try:
+            response = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                response_format={"type": "json_object"}
+            )
+            return json.loads(response.choices[0].message.content)
+        except RateLimitError as e:
+            if tentativa < max_tentativas:
+                msg_aviso = f"⚠️ Limite de taxa da Groq atingido. Aguardando {tempo_espera}s para tentar novamente ({tentativa}/{max_tentativas})..."
+                logger.warning(msg_aviso)
+                print(msg_aviso)
+                time.sleep(tempo_espera)
+                tempo_espera += 10
+            else:
+                raise e
 
 def _fallback_adaptacao(perfil_json: dict, descricao_vaga: str) -> dict:
     """Retorna uma estrutura fallback para execução de teste local sem a chave Groq."""
