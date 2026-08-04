@@ -100,14 +100,25 @@ def comando_status() -> str:
     except Exception as e:
         return f"⚠️ <b>Erro ao obter status:</b> {e}"
 
+BUSCA_EM_ANDAMENTO = False
+
 def comando_buscar(chat_id: str):
     """Executa a busca de vagas em tempo real e notifica o Telegram."""
+    global BUSCA_EM_ANDAMENTO
+
+    if BUSCA_EM_ANDAMENTO:
+        enviar_mensagem_telegram(chat_id, "⏳ <b>[BUSCA EM ANDAMENTO]</b> O robô já está varrendo a web neste momento. Aguarde a conclusão da rodada atual para disparar uma nova!")
+        return
+
+    BUSCA_EM_ANDAMENTO = True
     enviar_mensagem_telegram(chat_id, "⚡ <b>[BUSCA INICIADA]</b> Varrendo a web por novas vagas agora... Aguarde alguns instantes!")
     try:
         main.main()
         enviar_mensagem_telegram(chat_id, "✅ <b>[BUSCA CONCLUÍDA]</b> Varredura finalizada com sucesso! Se houverem novas vagas qualificadas, elas já foram enviadas acima.")
     except Exception as e:
         enviar_mensagem_telegram(chat_id, f"❌ <b>[ERRO NA BUSCA]</b> Falha ao executar varredura: {e}")
+    finally:
+        BUSCA_EM_ANDAMENTO = False
 
 def gerar_relatorio_diario_telegram() -> str:
     """Gera o resumo diário de desempenho (Daily Digest) consultando o Supabase e a SerpAPI."""

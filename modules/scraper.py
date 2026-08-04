@@ -202,15 +202,28 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
         print(f"[FILTRO TITULO DEVIANTE] Vaga descartada por fugir do perfil de Desenvolvedor / Analista de Sistemas: '{vaga.get('titulo')}'")
         return False
 
-    # 4. Identifica se a vaga é de Automação / n8n ou de outros cargos válidos (COBOL, Mainframe, Java, Analista de Sistemas)
+    # 4. Descarte de Tecnologias/Stacks incompatíveis no título (C++, C#, .NET, PHP, Ruby, Go, Mobile, etc.)
+    stacks_incompativeis_titulo = [
+        r'\bc\+\+\b', r'\bc#\b', r'\b\.net\b', r'\bdotnet\b', r'\bphp\b', r'\bruby\b', r'\bgolang\b', r'\bgo\b',
+        r'\bflutter\b', r'\bkotlin\b', r'\bswift\b', r'\bios\b', r'\bandroid\b', r'\bmobile\b'
+    ]
     eh_automacao = bool(re.search(r'\b(n8n|automa[cç][aã]o)\b', texto_completo, re.IGNORECASE))
-    eh_outros_cargos_validos = bool(re.search(r'\b(cobol|mainframe|analista\s+de\s+sistemas|java(?!\s*script))\b', texto_completo, re.IGNORECASE))
+    eh_cobol_mainframe = bool(re.search(r'\b(cobol|mainframe)\b', texto_completo, re.IGNORECASE))
+    eh_java = bool(re.search(r'\bjava(?!\s*script)\b', texto_completo, re.IGNORECASE))
 
-    if not eh_automacao and not eh_outros_cargos_validos:
-        print(f"[FILTRO CARGO] Vaga descartada por não conter COBOL, Mainframe, Analista de Sistemas, Java ou Automação: '{vaga.get('titulo')}'")
+    for stack in stacks_incompativeis_titulo:
+        if re.search(stack, titulo, re.IGNORECASE) and not (eh_automacao or eh_cobol_mainframe):
+            print(f"[FILTRO STACK INCOMPATÍVEL] Vaga descartada por ser de tecnologia diferente do perfil ({stack}): '{vaga.get('titulo')}'")
+            return False
+
+    # 5. Identifica se a vaga é de Automação / n8n, COBOL, Mainframe, Java ou Analista de Sistemas
+    eh_analista_sistemas = bool(re.search(r'\banalista\s+de\s+sistemas\b', texto_completo, re.IGNORECASE))
+
+    if not (eh_automacao or eh_cobol_mainframe or eh_java or eh_analista_sistemas):
+        print(f"[FILTRO CARGO] Vaga descartada por não ser das tecnologias alvo (COBOL, Mainframe, Java, n8n ou Analista de Sistemas): '{vaga.get('titulo')}'")
         return False
 
-    # 5. Checagem de Nível Pleno: Permitido APENAS se for vaga de Automação / n8n
+    # 6. Checagem de Nível Pleno: Permitido APENAS se for vaga de Automação / n8n
     eh_pleno = bool(re.search(r'\b(pleno|pl\.?|mid\s*-?\s*level)\b', titulo, re.IGNORECASE))
     if eh_pleno and not eh_automacao:
         print(f"[FILTRO SENIORIDADE] Vaga de Pleno descartada (permitida apenas para Automação/n8n): '{vaga.get('titulo')}'")
