@@ -293,7 +293,13 @@ def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
     return True
 
 TERMOS_EXCLUSIVOS_GRUPO_REGEX = [
-    # Exclusivas / Afirmativas para Mulheres
+    # Exclusivas / Afirmativas para Mulheres e Programas Femininos
+    r'\belas\s+in\s+tech\b',
+    r'\belas\s+na\s+tech\b',
+    r'\belas\s+em\s+tech\b',
+    r'\bprograma\s+elas\b',
+    r'\bwomen\s+in\s+tech\b',
+    r'\bwomen\s+tech\b',
     r'\bexclusiva\b.*?\bmulheres\b',
     r'\bafirmativa\b.*?\bmulheres\b',
     r'\bexclusivo\b.*?\bmulheres\b',
@@ -301,7 +307,9 @@ TERMOS_EXCLUSIVOS_GRUPO_REGEX = [
     r'\bapenas\b.*?\bmulheres\b',
     r'\bvaga\s+para\s+mulheres\b',
     r'\bmulheres\s+na\s+tech\b',
+    r'\bmulheres\s+in\s+tech\b',
     r'\bvaga\s+feminina\b',
+    r'\bpara\s+elas\b',
 
     # Exclusivas / Afirmativas para PCD
     r'\bexclusiva\b.*?\bpcd\b',
