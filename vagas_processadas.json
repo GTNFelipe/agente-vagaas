@@ -1,0 +1,62 @@
+[
+  {
+    "titulo_vaga": "Analista de Automação e Integrações (n8n & IA)",
+    "empresa": "CASINO",
+    "link_vaga": "https://br.trabajo.org/emprego-teste-12345",
+    "match_score": 85,
+    "justificativa": "Teste de gravacao no Supabase",
+    "resumo_adaptado": "Resumo teste automacao n8n",
+    "status_candidatura": "alerta_manual",
+    "criado_em": "2026-08-04T10:07:31.829602"
+  },
+  {
+    "titulo_vaga": "Desenvolvedor COBOL Mainframe Senior Teste",
+    "empresa": "Banco Bradesco Teste",
+    "link_vaga": "https://vagas.bradesco.com/job/123456",
+    "match_score": 95,
+    "justificativa": "Perfil atende 100% aos requisitos de Mainframe COBOL.",
+    "resumo_adaptado": "Desenvolvedor COBOL Mainframe com experiência em Bradesco, CICS e DB2.",
+    "status_candidatura": "alerta_manual",
+    "criado_em": "2026-08-04T10:21:39.684644"
+  },
+  {
+    "titulo_vaga": "Analista de N8N, Automação e Vibecoding",
+    "empresa": "IA Sem Limites",
+    "link_vaga": "https://bebee.com/br/jobs/analista-de-n8n-automacao-e-vibecoding-ia-sem-limites-sergipe--jooble-274056909936260734?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic",
+    "match_score": 85,
+    "justificativa": "O perfil base apresenta experiência prática com n8n, conhecimento em APIs, JSON, autenticação e integrações de sistemas, além de habilidades em lógica de programação, organização e responsabilidade.",
+    "resumo_adaptado": "Profissional de Tecnologia da Informação focado em desenvolvimento backend, automação e modernização de sistemas corporativos críticos. Experiência prática em fluxos automatizados com n8n, integrações entre sistemas via APIs REST, GraphQL e Webhooks, além de conhecimento em bancos de dados, como Supabase, PostgreSQL ou similares. Domínio na orquestração de processos via n8n, consumo de APIs REST, infraestrutura conteinerizada com Docker, gerenciamento de bancos de dados modernos e legado, além de sólida atuação sob metodologias ágeis e controle de qualidade ALM.",
+    "status_candidatura": "alerta_manual",
+    "criado_em": "2026-08-04T10:43:25.451588"
+  },
+  {
+    "titulo_vaga": "VAGA | Analista de Automação e Integrações",
+    "empresa": "CASTRO CSC SERVICOS DE APOIO ADMINISTRATIVO LTDA",
+    "link_vaga": "https://vagas.solides.com.br/vaga/882573/vaga-7c-analista-de-automacao-e-integracoes?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic",
+    "match_score": 0,
+    "justificativa": "Vaga encerrada ou inativa na web",
+    "resumo_adaptado": null,
+    "status_candidatura": "encerrada",
+    "criado_em": "2026-08-04T10:43:46.870007"
+  },
+  {
+    "titulo_vaga": "Analista de Automação e Integrações (n8n & IA)",
+    "empresa": "66.698.760 ANA GABRIELLA LEAO PININGA",
+    "link_vaga": "https://bebee.com/br/jobs/analista-de-automacao-e-integracoes-n8n-ia-66698760-ana-gabriella-leao-pininga-porto-alegre-rs--theirstack-740575982?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic",
+    "match_score": 85,
+    "justificativa": "O perfil base apresenta experiência em automação e integrações, habilidades em n8n, IA e desenvolvimento backend, além de uma formação em Análise e Desenvolvimento de Sistemas, o que o torna um candidato forte para a vaga de Analista de Automação e Integrações.",
+    "resumo_adaptado": "Profissional de Tecnologia da Informação focado em automação e integrações, com experiência em desenvolvimento backend, orquestração de processos via n8n, consumo de APIs REST e gerenciamento de bancos de dados modernos. Domínio em linguagens como Python, JavaScript e Java, além de habilidades em IA e automação com ferramentas como OpenAI API e n8n. Experiência em trabalhar em equipe e liderança de projetos, com habilidades em Scrum e Kanban.",
+    "status_candidatura": "alerta_manual",
+    "criado_em": "2026-08-04T10:43:55.447197"
+  },
+  {
+    "titulo_vaga": "Analista de Dados, Automações e IA (n8n/Python) – Sênior Cargo/Função: Analista de banco de dados",
+    "empresa": "Faculdade IBRA",
+    "link_vaga": "https://www.bne.com.br/vaga-de-emprego-na-area-informatica-em-caratinga-mg/analista-de-banco-de-dados/5728281?utm_campaign=google_jobs_apply&utm_source=google_jobs_apply&utm_medium=organic",
+    "match_score": 85,
+    "justificativa": "O perfil do candidato apresenta uma forte compatibilidade com os requisitos da vaga, destacando-se a experiência com Python, n8n, bancos de dados e inteligência artificial.",
+    "resumo_adaptado": "Profissional de Tecnologia da Informação focado em desenvolvimento backend, automação e modernização de sistemas corporativos críticos. Experiência prática em desenvolvimento de pipelines de dados, automações inteligentes com n8n e Python, e implementação de modelos de IA generativa e Machine Learning. Domínio em bancos de dados, conectores, APIs REST e Webhooks. Raciocínio analítico e visão de processos para otimizar fluxos e experiências.",
+    "status_candidatura": "alerta_manual",
+    "criado_em": "2026-08-04T10:44:27.415356"
+  }
+]

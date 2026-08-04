@@ -4,10 +4,19 @@ import re
 import time
 from dotenv import load_dotenv
 
-from modules.scraper import coletar_vagas_todas_fontes
+from modules.scraper import coletar_vagas_todas_fontes, vaga_ainda_ativa
 from modules.tailor import adaptar_curriculo
 from modules.pdf_generator import gerar_pdf_curriculo
-from modules.database import inicializar_supabase, vaga_ja_processada, salvar_vaga_processada
+from modules.dossier import gerar_dossie_vaga
+from modules.cover_letter import gerar_arquivo_carta_apresentacao
+from modules.database import (
+    inicializar_supabase,
+    vaga_ja_processada,
+    salvar_vaga_base,
+    salvar_vaga_processada,
+    salvar_curriculo_gerado,
+    salvar_dossie_entrevista
+)
 from modules.notifier import realizar_candidatura_auto_email, enviar_notificacao_vaga
 
 load_dotenv()
@@ -43,15 +52,41 @@ def main():
             print(f"[SKIP] Vaga ja registrada/candidatada: '{titulo}' ({vaga.get('empresa')}). Pulando...")
             continue
 
+        # Validação de status em tempo real na web
+        if link and not vaga_ainda_ativa(link):
+            print(f"[SKIP] Vaga ENCERRADA ou Inativa na web: '{titulo}' ({vaga.get('empresa')}). Pulando...")
+            salvar_vaga_processada(supabase_client, vaga, {"match_score": 0, "justificativa_match": "Vaga encerrada ou inativa na web"}, status_candidatura="encerrada")
+            continue
+
         print(f"\n[VAGA] Analisando: {titulo} - {vaga.get('empresa')}")
         analise = adaptar_curriculo(vaga.get("descricao", titulo), perfil_base)
         match_score = analise.get("match_score", 0)
         print(f"[SCORE] Score de Match: {match_score}%")
 
         if match_score >= 80:
-            clean_title = str(titulo).replace(' ', '_').replace('/', '_')
+            clean_title = re.sub(r'[^\w\-_]', '_', str(titulo)).strip("_")
+            
+            # 1. Gerar e SALVAR o PDF do Currículo Otimizado em pasta dedicada
+            pasta_cvs = "curriculos_gerados"
+            os.makedirs(pasta_cvs, exist_ok=True)
             nome_arquivo_pdf = f"CV_Felipe_Santana_{clean_title}_{match_score}.pdf"
-            caminho_pdf = gerar_pdf_curriculo(perfil_base, analise, output_filename=nome_arquivo_pdf)
+            caminho_pdf = os.path.join(pasta_cvs, nome_arquivo_pdf)
+            gerar_pdf_curriculo(perfil_base, analise, output_filename=caminho_pdf)
+
+            # 2. Gerar e SALVAR o Dossiê de Preparação para Entrevista
+            caminho_dossie = gerar_dossie_vaga(vaga, analise)
+
+            # 3. Gerar e SALVAR a Carta de Apresentação Profissional
+            caminho_carta = gerar_arquivo_carta_apresentacao(vaga, analise, perfil_base)
+
+            # 4. Registrar na tabela 'vagas' no Supabase para obter vaga_id (UUID)
+            vaga_id = salvar_vaga_base(supabase_client, vaga, match_score, status="QUALIFICADA")
+
+            # 5. Registrar na tabela 'curriculos_gerados' no Supabase
+            salvar_curriculo_gerado(supabase_client, vaga_id, caminho_pdf, analise)
+
+            # 6. Registrar na tabela 'prep_dossies' no Supabase
+            salvar_dossie_entrevista(supabase_client, vaga_id, analise)
 
             email_recrutador = extrair_email_texto(vaga.get("descricao", ""))
             status_envio = "alerta_manual"
@@ -64,14 +99,18 @@ def main():
                 if sucesso_apply:
                     status_envio = "candidatado_auto"
 
-            # Envia cópia / alerta para o desenvolvedor
-            enviar_notificacao_vaga(vaga, analise, caminho_pdf, modo_candidatura=("auto" if status_envio == "candidatado_auto" else "manual"))
+            # Envia cópia / alerta para o desenvolvedor anexando o CV, Dossiê e Carta
+            enviar_notificacao_vaga(
+                vaga_info=vaga,
+                analise_ia=analise,
+                caminho_pdf=caminho_pdf,
+                caminho_dossie=caminho_dossie,
+                caminho_carta=caminho_carta,
+                modo_candidatura=("auto" if status_envio == "candidatado_auto" else "manual")
+            )
 
-            # Registra no Supabase com o status da candidatura
+            # Registra na tabela 'vagas_processadas' do Supabase e cache local
             salvar_vaga_processada(supabase_client, vaga, analise, status_candidatura=status_envio)
-
-            if os.path.exists(caminho_pdf):
-                os.remove(caminho_pdf)
         else:
             print(f"[INFO] Vaga descartada (Score {match_score}% < 80%).")
             salvar_vaga_processada(supabase_client, vaga, analise, status_candidatura="descartado")

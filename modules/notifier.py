@@ -61,9 +61,9 @@ def realizar_candidatura_auto_email(vaga_info: dict, analise_ia: dict, caminho_p
         print(f"[ERRO] Erro ao enviar candidatura por e-mail: {e}")
         return False
 
-def enviar_notificacao_vaga(vaga_info: dict, analise_ia: dict, caminho_pdf: str = None, modo_candidatura: str = "manual"):
+def enviar_notificacao_vaga(vaga_info: dict, analise_ia: dict, caminho_pdf: str = None, caminho_dossie: str = None, caminho_carta: str = None, modo_candidatura: str = "manual"):
     """
-    Envia alerta ao candidato sobre uma nova vaga encontrada.
+    Envia alerta ao candidato sobre uma nova vaga encontrada com o CV, o Dossiê de Entrevista e a Carta de Apresentação anexados.
     """
     remetente = os.getenv("GMAIL_USER") or "felipestartt@gmail.com"
     senha_app = os.getenv("GMAIL_APP_PASSWORD")
@@ -80,6 +80,11 @@ def enviar_notificacao_vaga(vaga_info: dict, analise_ia: dict, caminho_pdf: str 
         assunto = f"[ALERTA VAGA] {vaga_info.get('titulo')} - Match: {analise_ia.get('match_score')}%"
         status_banner = "<div style='background: #EBF8FF; color: #2B6CB0; padding: 10px; border-radius: 5px; font-weight: bold;'>🔗 Candidatura Externa: Clique no link abaixo para anexar o PDF gerado.</div>"
 
+    dossie_info = analise_ia.get("dossie_entrevista", {})
+    pitch = dossie_info.get("pitch_elevador", "")
+    pontos_fortes = "<br>".join([f"• {pf}" for pf in dossie_info.get("pontos_fortes", [])])
+    carta_texto = analise_ia.get("cover_letter", "").replace("\n", "<br>")
+
     corpo_html = f"""
     <h2>🎯 Oportunidade Qualificada pelo Agente</h2>
     {status_banner}
@@ -90,10 +95,19 @@ def enviar_notificacao_vaga(vaga_info: dict, analise_ia: dict, caminho_pdf: str 
     <p><b>Justificativa:</b> {analise_ia.get('justificativa_match')}</p>
     <p><b>Link da Vaga:</b> <a href="{vaga_info.get('link')}">Ver Anúncio</a></p>
     <hr>
+    <h3>✉️ Carta de Apresentação Profissional (Pronta para Envio):</h3>
+    <div style="background: #F7FAFC; padding: 15px; border-left: 4px solid #319795; font-family: Georgia, serif; line-height: 1.6; color: #2D3748;">
+        {carta_texto}
+    </div>
+    <hr>
+    <h3>🎙️ Pitch de 1 Minuto para a Entrevista:</h3>
+    <p style="background: #FFF5F5; padding: 10px; border-left: 4px solid #E53E3E; font-style: italic;">"{pitch}"</p>
+    {f"<h4>💪 Pontos Fortes a Destacar:</h4><p>{pontos_fortes}</p>" if pontos_fortes else ""}
+    <hr>
     <h3>📝 Resumo Otimizado para esta Vaga:</h3>
     <p><i>{analise_ia.get('resumo_adaptado')}</i></p>
     <hr>
-    <p>📎 <i>O currículo completo otimizado em PDF está anexado a esta mensagem.</i></p>
+    <p>📎 <i>Os arquivos <b>Currículo PDF</b>, <b>Dossiê de Entrevista (.md)</b> e <b>Carta de Apresentação (.txt)</b> estão anexados a esta mensagem.</i></p>
     """
 
     msg = MIMEMultipart()
@@ -102,17 +116,32 @@ def enviar_notificacao_vaga(vaga_info: dict, analise_ia: dict, caminho_pdf: str 
     msg['Subject'] = assunto
     msg.attach(MIMEText(corpo_html, 'html'))
 
+    # Anexo do Currículo PDF
     if caminho_pdf and os.path.exists(caminho_pdf):
         with open(caminho_pdf, "rb") as f:
             pdf_attachment = MIMEApplication(f.read(), _subtype="pdf")
             pdf_attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(caminho_pdf))
             msg.attach(pdf_attachment)
 
+    # Anexo do Dossiê Markdown
+    if caminho_dossie and os.path.exists(caminho_dossie):
+        with open(caminho_dossie, "rb") as f:
+            md_attachment = MIMEApplication(f.read(), _subtype="octet-stream")
+            md_attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(caminho_dossie))
+            msg.attach(md_attachment)
+
+    # Anexo da Carta de Apresentação
+    if caminho_carta and os.path.exists(caminho_carta):
+        with open(caminho_carta, "rb") as f:
+            txt_attachment = MIMEApplication(f.read(), _subtype="plain")
+            txt_attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(caminho_carta))
+            msg.attach(txt_attachment)
+
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(remetente, senha_app)
             server.send_message(msg)
-        print(f"[SUCESSO] Alerta enviado para {destinatario}!")
+        print(f"[SUCESSO] Alerta, Dossiê e Carta de Apresentação enviados para {destinatario}!")
     except Exception as e:
         print(f"[ERRO] Erro ao enviar e-mail de alerta: {e}")
 

@@ -105,3 +105,67 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     vagas_finais = todas_vagas + vagas_rss_filtradas
     print(f"[SUCESSO] Total de vagas coletadas (filtradas por relevancia): {len(vagas_finais)}")
     return vagas_finais
+
+def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
+    """
+    Verifica em tempo real se a vaga no link informado continua ativa e aceitando candidaturas.
+    Retorna False se o link retornar HTTP >= 400, redirecionar para página inicial genérica,
+    ou contiver palavras-chave de encerramento ('vaga encerrada', 'job closed', etc.).
+    """
+    if not url or not str(url).startswith("http"):
+        return False
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
+    }
+
+    try:
+        response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+
+        if response.status_code >= 400:
+            print(f"[VALIDAÇÃO] Link inativo ou indisponível (HTTP {response.status_code}): {url}")
+            return False
+
+        final_url = response.url.lower().rstrip("/")
+        path_parts = [p for p in final_url.replace("https://", "").replace("http://", "").split("/") if p]
+        if len(path_parts) <= 1:
+            print(f"[VALIDAÇÃO] Link redirecionou para a página inicial (vaga removida): {url} -> {response.url}")
+            return False
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        texto_pagina = soup.get_text().lower()
+
+        expressoes_encerramento = [
+            "vaga encerrada",
+            "vaga finalizada",
+            "vaga inativa",
+            "vaga expirada",
+            "vaga preenchida",
+            "vaga desativada",
+            "vaga suspensa",
+            "não aceita mais candidaturas",
+            "nao aceita mais candidaturas",
+            "não está mais aceitando",
+            "nao esta mais aceitando",
+            "esta vaga expirou",
+            "vaga não disponível",
+            "vaga nao disponivel",
+            "job closed",
+            "no longer accepting applications",
+            "job is no longer available",
+            "página não encontrada",
+            "pagina nao encontrada",
+            "404 not found"
+        ]
+
+        for expr in expressoes_encerramento:
+            if expr in texto_pagina:
+                print(f"[VALIDAÇÃO] Vaga encerrada detectada ('{expr}'): {url}")
+                return False
+
+        return True
+
+    except Exception as e:
+        print(f"[AVISO] Nao foi possivel checar status HTTP do link ({url}): {e}")
+        return True

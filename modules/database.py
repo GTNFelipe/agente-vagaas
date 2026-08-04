@@ -99,23 +99,54 @@ def vaga_ja_processada(supabase: Optional[Client], vaga_or_link: Any) -> bool:
 
     return False
 
-def salvar_vaga_processada(supabase: Optional[Client], vaga_data: dict, analise_ia: dict, status_candidatura: str = "alerta_manual"):
+def salvar_vaga_base(supabase: Optional[Client], vaga_data: dict, match_score: int, status: str = "ENCONTRADA") -> Optional[str]:
+    """
+    Registra a vaga na tabela 'vagas' do Supabase e retorna o ID UUID gerado.
+    """
+    if not supabase:
+        return None
+
     registro = {
+        "titulo": vaga_data.get("titulo"),
+        "empresa": vaga_data.get("empresa"),
+        "link": vaga_data.get("link"),
+        "descricao": vaga_data.get("descricao", ""),
+        "match_score": match_score,
+        "status": status
+    }
+
+    try:
+        res = supabase.table("vagas").insert(registro).execute()
+        if res.data and len(res.data) > 0:
+            vaga_id = res.data[0].get("id")
+            print(f"[SUCESSO] Vaga salva na tabela 'vagas' Supabase (ID: {vaga_id})!")
+            return vaga_id
+    except Exception as e:
+        print(f"[AVISO] Erro ao salvar na tabela 'vagas': {e}")
+    return None
+
+def salvar_vaga_processada(supabase: Optional[Client], vaga_data: dict, analise_ia: dict, status_candidatura: str = "alerta_manual") -> Optional[str]:
+    """
+    Registra o histórico da análise na tabela 'vagas_processadas' do Supabase.
+    """
+    registro_supabase = {
         "titulo_vaga": vaga_data.get("titulo"),
         "empresa": vaga_data.get("empresa"),
         "link_vaga": vaga_data.get("link"),
         "match_score": analise_ia.get("match_score"),
         "justificativa": analise_ia.get("justificativa_match"),
         "resumo_adaptado": analise_ia.get("resumo_adaptado"),
-        "status_candidatura": status_candidatura,
-        "criado_em": datetime.now().isoformat()
+        "status_candidatura": status_candidatura
     }
+
+    registro_local = dict(registro_supabase)
+    registro_local["criado_em"] = datetime.now().isoformat()
 
     # 1. Salvar no cache local
     vagas_locais = _carregar_vagas_locais()
-    link_reg = _normalizar_url(registro.get("link_vaga", ""))
-    tit_reg = _normalizar_string(registro.get("titulo_vaga", ""))
-    emp_reg = _normalizar_string(registro.get("empresa", ""))
+    link_reg = _normalizar_url(registro_supabase.get("link_vaga", ""))
+    tit_reg = _normalizar_string(registro_supabase.get("titulo_vaga", ""))
+    emp_reg = _normalizar_string(registro_supabase.get("empresa", ""))
 
     ja_existe_local = False
     for v in vagas_locais:
@@ -127,18 +158,70 @@ def salvar_vaga_processada(supabase: Optional[Client], vaga_data: dict, analise_
             break
 
     if not ja_existe_local:
-        vagas_locais.append(registro)
+        vagas_locais.append(registro_local)
         _salvar_vagas_locais(vagas_locais)
 
     # 2. Salvar no Supabase
     if supabase:
         try:
-            supabase.table("vagas_processadas").insert(registro).execute()
-            print(f"[SUCESSO] Vaga '{vaga_data.get('titulo')}' salva no Supabase (Status: {status_candidatura})!")
+            res = supabase.table("vagas_processadas").insert(registro_supabase).execute()
+            print(f"[SUCESSO] Vaga '{vaga_data.get('titulo')}' salva em 'vagas_processadas' Supabase!")
+            if res.data and len(res.data) > 0:
+                return res.data[0].get("id")
         except Exception as e:
-            print(f"[ERRO] Erro ao salvar no Supabase: {e}")
+            print(f"[ERRO] Erro ao salvar em 'vagas_processadas': {e}")
     else:
-        print(f"[INFO] Vaga '{vaga_data.get('titulo')}' salva no cache local 'vagas_processadas.json' (Status: {status_candidatura}).")
+        print(f"[INFO] Supabase nao conectado. Vaga '{vaga_data.get('titulo')}' registrada localmente em 'vagas_processadas.json'.")
+    return None
+
+def salvar_curriculo_gerado(supabase: Optional[Client], vaga_id: Optional[str], pdf_path: str, analise_ia: dict) -> Optional[str]:
+    """
+    Registra o currículo otimizado na tabela 'curriculos_gerados' do Supabase.
+    """
+    if not supabase or not vaga_id:
+        return None
+
+    registro = {
+        "vaga_id": vaga_id,
+        "pdf_url": pdf_path,
+        "conteudo_json": analise_ia
+    }
+
+    try:
+        res = supabase.table("curriculos_gerados").insert(registro).execute()
+        if res.data and len(res.data) > 0:
+            cg_id = res.data[0].get("id")
+            print(f"[SUCESSO] Currículo registrado na tabela 'curriculos_gerados' Supabase (ID: {cg_id})!")
+            return cg_id
+    except Exception as e:
+        print(f"[ERRO] Erro ao salvar em 'curriculos_gerados': {e}")
+    return None
+
+def salvar_dossie_entrevista(supabase: Optional[Client], vaga_id: Optional[str], analise_ia: dict) -> Optional[str]:
+    """
+    Registra o dossiê de entrevista na tabela 'prep_dossies' do Supabase.
+    """
+    if not supabase or not vaga_id:
+        return None
+
+    dossie_data = analise_ia.get("dossie_entrevista", {})
+    resumo_empresa = analise_ia.get("justificativa_match") or analise_ia.get("resumo_adaptado") or ""
+
+    registro = {
+        "vaga_id": vaga_id,
+        "resumo_empresa": resumo_empresa,
+        "perguntas_sugeridas": dossie_data
+    }
+
+    try:
+        res = supabase.table("prep_dossies").insert(registro).execute()
+        if res.data and len(res.data) > 0:
+            pd_id = res.data[0].get("id")
+            print(f"[SUCESSO] Dossiê registrado na tabela 'prep_dossies' Supabase (ID: {pd_id})!")
+            return pd_id
+    except Exception as e:
+        print(f"[ERRO] Erro ao salvar em 'prep_dossies': {e}")
+    return None
 
 # Aliases para compatibilidade
 get_supabase_client = inicializar_supabase
