@@ -462,3 +462,46 @@ def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
     except Exception as e:
         print(f"[AVISO] Nao foi possivel checar status HTTP do link ({url}): {e}")
         return True
+
+EMAILS_IGNORADOS = [
+    "noreply", "no-reply", "donotreply", "do-not-reply",
+    "support@", "suporte@", "privacy@", "privacidade@", "info@google",
+    "example", "glassdoor", "gupy.io", "linkedin", "sentry.io", "github.com",
+    "w3.org", "schema.org", "domain.com", "email.com"
+]
+
+def extrair_email_profundo(url: str, timeout: int = 8) -> str:
+    """
+    Realiza o Scraping Profundo acessando a página web do anúncio em tempo real
+    para localizar e-mails diretos de recrutadores, RH e seleção.
+    """
+    if not url or not str(url).startswith("http"):
+        return None
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
+    }
+
+    try:
+        response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+        if response.status_code >= 400:
+            return None
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        texto_pagina = soup.get_text()
+
+        # Regex para capturar e-mails no HTML completo da página
+        emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', texto_pagina)
+
+        for email in emails:
+            email_lower = email.lower()
+            # Ignora e-mails genéricos de sistema/suporte/plataforma
+            if not any(ign in email_lower for ign in EMAILS_IGNORADOS):
+                print(f"[DEEP SCRAPING] E-mail de recrutador/RH encontrado na página original: {email} (Link: {url})")
+                return email
+
+    except Exception as e:
+        print(f"[AVISO DEEP SCRAPING] Erro ao buscar e-mail em {url}: {e}")
+
+    return None

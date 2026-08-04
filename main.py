@@ -4,7 +4,7 @@ import re
 import time
 from dotenv import load_dotenv
 
-from modules.scraper import coletar_vagas_todas_fontes, vaga_ainda_ativa
+from modules.scraper import coletar_vagas_todas_fontes, vaga_ainda_ativa, extrair_email_profundo
 from modules.tailor import adaptar_curriculo
 from modules.pdf_generator import gerar_pdf_curriculo
 from modules.dossier import gerar_dossie_vaga
@@ -89,12 +89,18 @@ def main():
             salvar_dossie_entrevista(supabase_client, vaga_id, analise)
 
             email_recrutador = extrair_email_texto(vaga.get("descricao", ""))
+            
+            # Se não encontrou e-mail no resumo -> Executa o SCRAPING PROFUNDO na página web oficial da vaga!
+            if not email_recrutador and vaga.get("link"):
+                print(f"[DEEP SCRAPING] Investigando e-mail de RH na página original: {vaga.get('link')}...")
+                email_recrutador = extrair_email_profundo(vaga.get("link"))
+
             status_envio = "alerta_manual"
 
             # Se encontrou e-mail de recrutador -> APLICA AUTOMÁTICO!
             if email_recrutador:
                 vaga["email_candidatura"] = email_recrutador
-                print(f"[AUTO-APPLY] E-mail de recrutador identificado: {email_recrutador}. Executando Auto-Apply...")
+                print(f"[AUTO-APPLY] E-mail de recrutador identificado ({email_recrutador}). Executando Auto-Apply...")
                 sucesso_apply = realizar_candidatura_auto_email(vaga, analise, caminho_pdf)
                 if sucesso_apply:
                     status_envio = "candidatado_auto"
