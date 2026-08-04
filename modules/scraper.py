@@ -143,18 +143,18 @@ CARGOS_EXCLUIDOS_REGEX = [
     r'\bsuporte\b', r'\bhelpdesk\b', r'\bservice\s*desk\b', r'\bn1\b', r'\bn2\b', r'\bn3\b'
 ]
 
-SENIORIDADE_EXCLUIDA_REGEX = [
+SENIORIDADE_ALTA_REGEX = [
     r'\bs[eê]nior\b', r'\bsr\.?\b', r'\bsnr\b',
-    r'\bpleno\b', r'\bpl\.?\b', r'\bmid\s*-?\s*level\b',
     r'\blead\b', r'\bl[ií]der\b', r'\bcoordenador\b', r'\bgerente\b', r'\bmanager\b',
     r'\bhead\b', r'\bdiretor\b', r'\barquitet[oa]\b', r'\barchitect\b', r'\bespecialista\b', r'\bspecialist\b'
 ]
 
 def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
     """
-    Filtra estritamente os cargos aceitos (COBOL, Mainframe, Analista de Sistemas, Java, Automação/n8n)
-    exclusivamente no nível JÚNIOR / TRAINEE.
-    Descarte imediato para: Cloud, DevOps, SRE, Analista de Dados, Analista de Suporte e vagas de nível Pleno/Sênior/Lead/Especialista.
+    Filtra estritamente os cargos aceitos:
+    - COBOL, Mainframe, Analista de Sistemas e Java: APENAS nível JÚNIOR / TRAINEE.
+    - Automação / n8n: Nível JÚNIOR, TRAINEE ou PLENO.
+    Descarte para: Cloud, DevOps, SRE, Analista de Dados, Analista de Suporte e vagas de nível Sênior/Lead/Especialista.
     """
     titulo = str(vaga.get("titulo", "")).lower()
     descricao = str(vaga.get("descricao", "")).lower()
@@ -166,25 +166,24 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
             print(f"[FILTRO ÁREA EXCLUÍDA] Vaga descartada por ser de área não desejada ({area}): '{vaga.get('titulo')}'")
             return False
 
-    # 2. Descarte imediato se contiver senioridade elevada (Sênior, Pleno, Lead, Especialista, Gerente) no título
-    for sen in SENIORIDADE_EXCLUIDA_REGEX:
+    # 2. Descarte imediato de senioridade alta (Sênior, Lead, Gerente, Especialista, Architect)
+    for sen in SENIORIDADE_ALTA_REGEX:
         if re.search(sen, titulo, re.IGNORECASE):
-            print(f"[FILTRO SENIORIDADE] Vaga descartada por ser de nível Pleno/Sênior/Lead ({sen}): '{vaga.get('titulo')}'")
+            print(f"[FILTRO SENIORIDADE ALTA] Vaga descartada por ser de nível Sênior/Lead ({sen}): '{vaga.get('titulo')}'")
             return False
 
-    # 3. Validação de Cargos Permitidos (COBOL, Mainframe, Analista de Sistemas, Java, Automação/n8n)
-    cargos_validos = [
-        r'\bcobol\b',
-        r'\bmainframe\b',
-        r'\banalista\s+de\s+sistemas\b',
-        r'\bjava\b(?!\s*script)',
-        r'\bn8n\b',
-        r'\bautoma[cç][aã]o\b'
-    ]
+    # 3. Identifica se a vaga é de Automação / n8n ou de outros cargos válidos
+    eh_automacao = bool(re.search(r'\b(n8n|automa[cç][aã]o)\b', texto_completo, re.IGNORECASE))
+    eh_outros_cargos_validos = bool(re.search(r'\b(cobol|mainframe|analista\s+de\s+sistemas|java(?!\s*script))\b', texto_completo, re.IGNORECASE))
 
-    tem_cargo_valido = any(re.search(cv, texto_completo, re.IGNORECASE) for cv in cargos_validos)
-    if not tem_cargo_valido:
+    if not eh_automacao and not eh_outros_cargos_validos:
         print(f"[FILTRO CARGO] Vaga descartada por não ser COBOL, Mainframe, Analista de Sistemas, Java ou Automação: '{vaga.get('titulo')}'")
+        return False
+
+    # 4. Checagem de Nível Pleno: Permitido APENAS se for vaga de Automação / n8n
+    eh_pleno = bool(re.search(r'\b(pleno|pl\.?|mid\s*-?\s*level)\b', titulo, re.IGNORECASE))
+    if eh_pleno and not eh_automacao:
+        print(f"[FILTRO SENIORIDADE] Vaga de Pleno descartada (permitida apenas para Automação/n8n): '{vaga.get('titulo')}'")
         return False
 
     return True
