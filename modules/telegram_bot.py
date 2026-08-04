@@ -4,6 +4,13 @@ import time
 import requests
 from dotenv import load_dotenv
 
+# Configura encoding de saída para evitar crash com emojis no console do Windows (cp1252)
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 load_dotenv()
 
 # Adiciona o diretório raiz ao PYTHONPATH para permitir importações dos módulos
