@@ -348,18 +348,19 @@ def eh_vaga_publico_geral(vaga: dict) -> bool:
 
 def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     """
-    Executa a varredura em todas as fontes configuradas para os cargos alvo definidos,
-    filtrando EXCLUSIVAMENTE por vagas no Brasil, públicas/gerais, candidaturas gratuitas e Remotas/RJ.
+    Executa a varredura em 1 ÚNICA pesquisa unificada na SerpAPI por execução do bot,
+    garantindo que 1 execução do bot consuma exatamente 1 pesquisa da sua cota.
+    Isso permite rodar o bot até 8 vezes ao dia (240 pesquisas/mês) sem estourar o limite de 250!
     """
     todas_vagas = []
     
-    for cargo in cargos_alvo:
-        query_busca = f"{cargo} Brasil (remoto OR 'rio de janeiro')"
-        print(f"[BUSCA] Varrendo a web por: '{query_busca}'...")
-        vagas_google = buscar_vagas_google_jobs(query=query_busca)
-        todas_vagas.extend(vagas_google)
+    # 1 Única requisição otimizada contendo todos os termos alvo
+    query_unificada = "(COBOL OR Mainframe OR Java OR n8n OR 'Analista de Sistemas' OR 'Desenvolvedor') Brasil (remoto OR 'rio de janeiro')"
+    print(f"[BUSCA UNIFICADA] Disparando 1 pesquisa na SerpAPI: '{query_unificada}'...")
+    vagas_google = buscar_vagas_google_jobs(query=query_unificada)
+    todas_vagas.extend(vagas_google)
 
-    print("[BUSCA] Varrendo feeds RSS de vagas...")
+    print("[BUSCA FEEDS] Varrendo RSS Feeds de vagas (Gratuito / Sem consumo de cota)...")
     vagas_rss = buscar_vagas_rss_feed()
     todas_coletadas = todas_vagas + vagas_rss
 
