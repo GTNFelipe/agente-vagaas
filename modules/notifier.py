@@ -61,14 +61,101 @@ def realizar_candidatura_auto_email(vaga_info: dict, analise_ia: dict, caminho_p
         print(f"[ERRO] Erro ao enviar candidatura por e-mail: {e}")
         return False
 
+def enviar_notificacao_telegram(vaga_info: dict, analise_ia: dict, caminho_pdf: str = None, caminho_dossie: str = None, caminho_carta: str = None, modo_candidatura: str = "manual") -> bool:
+    """
+    Envia notificação rica via Bot do Telegram para o candidato com anexos (CV PDF, Dossiê MD, Carta TXT).
+    """
+    import requests
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
+    if not bot_token or not chat_id:
+        return False
+
+    api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    doc_url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
+
+    dossie_info = analise_ia.get("dossie_entrevista", {})
+    pitch = dossie_info.get("pitch_elevador", "")
+    pontos_fortes = "\n".join([f"• {pf}" for pf in dossie_info.get("pontos_fortes", [])])
+    carta = analise_ia.get("cover_letter", "")
+
+    if modo_candidatura == "auto":
+        banner = "✅ <b>CANDIDATURA AUTOMÁTICA ENVIADA POR E-MAIL!</b>"
+    else:
+        banner = "🎯 <b>NOVA OPORTUNIDADE QUALIFICADA!</b>"
+
+    mensagem = f"""{banner}
+
+<b>Empresa:</b> {vaga_info.get('empresa')}
+<b>Cargo:</b> {vaga_info.get('titulo')}
+<b>Match Score:</b> 🟢 <b>{analise_ia.get('match_score')}%</b>
+<b>Justificativa:</b> {analise_ia.get('justificativa_match')}
+
+🔗 <a href="{vaga_info.get('link')}">Ver Anúncio da Vaga</a>
+
+────────────────────────
+🎙️ <b>Pitch de 1 Minuto para Entrevista:</b>
+<i>"{pitch}"</i>
+
+💪 <b>Pontos Fortes:</b>
+{pontos_fortes}
+
+────────────────────────
+✉️ <b>Carta de Apresentação:</b>
+<i>{carta}</i>
+"""
+
+    payload = {
+        "chat_id": chat_id,
+        "text": mensagem,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": False
+    }
+
+    try:
+        resp = requests.post(api_url, data=payload, timeout=10)
+        if resp.status_code == 200:
+            print(f"[TELEGRAM] Notificação enviada com sucesso para o Telegram (Chat ID: {chat_id})!")
+        else:
+            print(f"[AVISO TELEGRAM] Falha ao enviar mensagem Telegram: {resp.text}")
+    except Exception as e:
+        print(f"[ERRO TELEGRAM] Erro ao enviar notificação Telegram: {e}")
+
+    # Envia os anexos (PDF, Dossiê, Carta) se existirem
+    for fpath in [caminho_pdf, caminho_dossie, caminho_carta]:
+        if fpath and os.path.exists(fpath):
+            try:
+                with open(fpath, "rb") as doc_file:
+                    files = {"document": (os.path.basename(fpath), doc_file)}
+                    data = {"chat_id": chat_id}
+                    requests.post(doc_url, data=data, files=files, timeout=15)
+                print(f"[TELEGRAM] Anexo '{os.path.basename(fpath)}' enviado com sucesso para o Telegram!")
+            except Exception as e:
+                print(f"[ERRO TELEGRAM] Erro ao enviar anexo '{fpath}': {e}")
+
+    return True
+
 def enviar_notificacao_vaga(vaga_info: dict, analise_ia: dict, caminho_pdf: str = None, caminho_dossie: str = None, caminho_carta: str = None, modo_candidatura: str = "manual"):
     """
-    Envia alerta ao candidato sobre uma nova vaga encontrada com o CV, o Dossiê de Entrevista e a Carta de Apresentação anexados.
+    Envia alerta ao candidato sobre uma nova vaga via Telegram (se configurado) e/ou E-mail.
     """
+    # 1. Tenta enviar via Telegram
+    enviado_telegram = enviar_notificacao_telegram(
+        vaga_info=vaga_info,
+        analise_ia=analise_ia,
+        caminho_pdf=caminho_pdf,
+        caminho_dossie=caminho_dossie,
+        caminho_carta=caminho_carta,
+        modo_candidatura=modo_candidatura
+    )
+
+    # 2. Envia via E-mail (Gmail SMTP) se configurado
     remetente = os.getenv("GMAIL_USER") or "felipestartt@gmail.com"
     senha_app = os.getenv("GMAIL_APP_PASSWORD")
     if not senha_app:
-        print("[AVISO] GMAIL_APP_PASSWORD nao configurada. Alerta nao enviado.")
+        if not enviado_telegram:
+            print("[AVISO] Nem Telegram nem Gmail configurados. Notificação não enviada.")
         return
 
     destinatario = os.getenv("NOTIFY_EMAIL") or remetente
@@ -141,7 +228,7 @@ def enviar_notificacao_vaga(vaga_info: dict, analise_ia: dict, caminho_pdf: str 
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(remetente, senha_app)
             server.send_message(msg)
-        print(f"[SUCESSO] Alerta, Dossiê e Carta de Apresentação enviados para {destinatario}!")
+        print(f"[SUCESSO] Alerta enviado para {destinatario} via E-mail!")
     except Exception as e:
         print(f"[ERRO] Erro ao enviar e-mail de alerta: {e}")
 
