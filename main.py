@@ -111,6 +111,14 @@ def main():
 
             # Registra na tabela 'vagas_processadas' do Supabase e cache local
             salvar_vaga_processada(supabase_client, vaga, analise, status_candidatura=status_envio)
+
+            # Limpeza automática: Deleta os arquivos temporários após envio (mantendo salvos 100% no Supabase)
+            for temp_file in [caminho_pdf, caminho_dossie, caminho_carta]:
+                if temp_file and os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                    except Exception as e:
+                        print(f"[AVISO] Erro ao remover arquivo temporario ({temp_file}): {e}")
         else:
             print(f"[INFO] Vaga descartada (Score {match_score}% < 80%).")
             salvar_vaga_processada(supabase_client, vaga, analise, status_candidatura="descartado")
