@@ -13,13 +13,16 @@ except ImportError:
 LOCAL_DB_FILE = "vagas_processadas.json"
 
 def inicializar_supabase() -> Optional[Client]:
+    load_dotenv()
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_KEY")
     if not url or not key or create_client is None:
+        print("[AVISO] SUPABASE_URL ou SUPABASE_KEY nao encontradas nas variáveis de ambiente.")
         return None
     try:
         return create_client(url, key)
-    except Exception:
+    except Exception as e:
+        print(f"[ERRO INIT SUPABASE] Falha ao conectar no Supabase: {e}")
         return None
 
 def _carregar_vagas_locais() -> list:
