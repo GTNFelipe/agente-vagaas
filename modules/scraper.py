@@ -189,12 +189,11 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
             print(f"[FILTRO SENIORIDADE ALTA] Vaga descartada por ser de nível Sênior/Lead ({sen}): '{vaga.get('titulo')}'")
             return False
 
-    # 3. Validação de Título: Deve se enquadrar como Desenvolvedor/Programador/Engenheiro de Software ou Analista de Sistemas/Automação
+    # 3. Validação de Título: Deve se enquadrar como Desenvolvedor/Programador/Engenheiro ou Analista
     padroes_titulo_dev_analista = [
         r'\bdesenvolvedor[a]?\b', r'\bdeveloper\b', r'\bprogramador[a]?\b', r'\bprogrammer\b',
         r'\bsoftware\s+engineer\b', r'\bengenheiro[a]?\s+de\s+software\b',
-        r'\banalista\s+de\s+sistemas\b', r'\banalista\s+de\s+automa[cç][aã]o\b',
-        r'\banalista\s+n8n\b', r'\banalista\s+de\s+desenvolvimento\b', r'\banalista\s+backend\b'
+        r'\banalista\b', r'\bautoma[cç][aã]o\b', r'\bn8n\b'
     ]
 
     tem_titulo_dev_analista = any(re.search(ptd, titulo, re.IGNORECASE) for ptd in padroes_titulo_dev_analista)
@@ -434,20 +433,24 @@ def buscar_vagas_github_repos() -> list:
 
 def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     """
-    Executa a varredura em 1 ÚNICA pesquisa unificada na SerpAPI por execução do bot,
-    garantindo que 1 execução do bot consuma exatamente 1 pesquisa da sua cota.
-    Isso permite rodar o bot até 8 vezes ao dia (240 pesquisas/mês) sem estourar o limite de 250!
+    Executa a varredura em todas as fontes (Google Jobs via SerpAPI, Programathor, GitHub Repos e RSS Feeds).
+    Utiliza pesquisas direcionadas no Google Jobs por cargo alvo para garantir máximo rendimento de vagas.
     """
     todas_vagas = []
     
-    # 1 Única requisição otimizada contendo todos os termos alvo
-    query_unificada = "(COBOL OR Mainframe OR Java OR n8n OR 'Analista de Sistemas' OR 'Desenvolvedor') Brasil (remoto OR 'rio de janeiro')"
-    print(f"[BUSCA UNIFICADA] Disparando 1 pesquisa na SerpAPI: '{query_unificada}'...")
-    vagas_google = buscar_vagas_google_jobs(query=query_unificada)
-    todas_vagas.extend(vagas_google)
+    # Buscas direcionadas no Google Jobs por categoria/tecnologia
+    queries_google = [
+        "Desenvolvedor Java Junior Brasil",
+        "Analista de Sistemas Junior Brasil",
+        "Desenvolvedor COBOL Mainframe Brasil",
+        "n8n automacao Brasil"
+    ]
 
-    print("[BUSCA FEEDS] Varrendo RSS Feeds de vagas (Gratuito / Sem consumo de cota)...")
-    vagas_rss = buscar_vagas_rss_feed()
+    print("[BUSCA GOOGLE JOBS] Disparando pesquisas direcionadas no Google Jobs via SerpAPI...")
+    for query in queries_google:
+        vagas_g = buscar_vagas_google_jobs(query=query)
+        print(f"[GOOGLE JOBS] Query '{query}' retornou {len(vagas_g)} vagas.")
+        todas_vagas.extend(vagas_g)
 
     print("[BUSCA PROGRAMATHOR] Varrendo portal Programathor (Gratuito / Sem consumo de cota)...")
     vagas_programathor = buscar_vagas_programathor()
@@ -455,7 +458,10 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     print("[BUSCA FORUNS TECH] Varrendo fóruns de comunidade no GitHub (backend-br e soujava)...")
     vagas_github_forums = buscar_vagas_github_repos()
 
-    todas_coletadas = todas_vagas + vagas_rss + vagas_programathor + vagas_github_forums
+    print("[BUSCA FEEDS] Varrendo RSS Feeds de vagas (Gratuito / Sem consumo de cota)...")
+    vagas_rss = buscar_vagas_rss_feed()
+
+    todas_coletadas = todas_vagas + vagas_programathor + vagas_github_forums + vagas_rss
 
     vagas_filtradas = []
     
