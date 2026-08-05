@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import socket
 import requests
 from dotenv import load_dotenv
 
@@ -10,6 +11,22 @@ if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
+
+def garantir_instancia_unica(port: int = 47891):
+    """
+    Garante que apenas UMA única instância do bot do Telegram rode na máquina por vez.
+    Se outra instância tentar iniciar, ela é encerrada imediatamente para evitar respostas duplicadas.
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind(("127.0.0.1", port))
+        return sock
+    except socket.error:
+        print(f"[BOT LOCK] Outra instância do bot já está rodando (Porta {port}). Encerrando duplicata.")
+        sys.exit(0)
+
+# Ativa trava de instância única
+_bot_lock_socket = garantir_instancia_unica()
 
 load_dotenv()
 
