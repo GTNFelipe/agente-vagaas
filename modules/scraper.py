@@ -1,7 +1,14 @@
 import os
+import sys
 import re
 import requests
 from bs4 import BeautifulSoup
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 try:
     from serpapi import GoogleSearch

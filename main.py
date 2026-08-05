@@ -1,8 +1,15 @@
 import json
 import os
+import sys
 import re
 import time
 from dotenv import load_dotenv
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 from modules.scraper import coletar_vagas_todas_fontes, vaga_ainda_ativa, extrair_email_profundo
 from modules.tailor import adaptar_curriculo
