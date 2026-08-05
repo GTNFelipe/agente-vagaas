@@ -25,9 +25,6 @@ def garantir_instancia_unica(port: int = 47891):
         print(f"[BOT LOCK] Outra instância do bot já está rodando (Porta {port}). Encerrando duplicata.")
         sys.exit(0)
 
-# Ativa trava de instância única
-_bot_lock_socket = garantir_instancia_unica()
-
 load_dotenv()
 
 # Adiciona o diretório raiz ao PYTHONPATH para permitir importações dos módulos
@@ -213,6 +210,9 @@ Comandos disponíveis:
 
 def escutar_comandos():
     """Inicia o loop de escuta de comandos do Telegram via Long Polling."""
+    # Ativa trava de instância única para o bot interativo
+    garantir_instancia_unica()
+
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         print("[BOT TELEGRAM] TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não definidos.")
         return
