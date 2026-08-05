@@ -14,11 +14,17 @@ except ImportError:
 LOCAL_DB_FILE = "vagas_processadas.json"
 
 def inicializar_supabase() -> Optional[Client]:
-    load_dotenv()
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env_file = os.path.join(base_dir, ".env")
+    if os.path.exists(env_file):
+        load_dotenv(dotenv_path=env_file)
+    else:
+        load_dotenv()
+
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_KEY")
     if not url or not key or create_client is None:
-        print("[AVISO] SUPABASE_URL ou SUPABASE_KEY nao encontradas nas variáveis de ambiente.")
+        print(f"[AVISO] SUPABASE_URL ou SUPABASE_KEY nao encontradas nas variaveis de ambiente (base_dir: {base_dir}).")
         return None
     try:
         return create_client(url, key)

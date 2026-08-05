@@ -25,10 +25,15 @@ def garantir_instancia_unica(port: int = 47891):
         print(f"[BOT LOCK] Outra instância do bot já está rodando (Porta {port}). Encerrando duplicata.")
         sys.exit(0)
 
-load_dotenv()
-
 # Adiciona o diretório raiz ao PYTHONPATH para permitir importações dos módulos
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
+
+ENV_FILE = os.path.join(BASE_DIR, ".env")
+if os.path.exists(ENV_FILE):
+    load_dotenv(dotenv_path=ENV_FILE)
+else:
+    load_dotenv()
 
 from modules.database import inicializar_supabase
 import main
