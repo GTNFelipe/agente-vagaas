@@ -73,7 +73,7 @@ agente-vagaas/
 
 - ✅ **Aprovados**:
   - **Localização**: 100% Remoto (Home Office / Remote em qualquer lugar do Brasil) OU Híbrido/Presencial localizado **estritamente no Estado do Rio de Janeiro (RJ)**.
-  - **Cargos**: COBOL, Mainframe, Analista de Sistemas, Java, Python (**Júnior / Trainee / Estágio**); Automação / n8n / Low-code / No-code / Vibe Code (**Júnior, Trainee ou Pleno**).
+  - **Cargos**: COBOL, Mainframe, Automação / n8n / Low-code / No-code / Vibe Code (**Júnior, Trainee ou Pleno**); Analista de Sistemas, Java, Python (**Júnior / Trainee / Estágio**).
   - **Candidatura**: 100% Gratuita.
 - ❌ **Descartados**:
   - **Localização Incompatível**: 100% de descarte de vagas presenciais ou híbridas fora do RJ (ex: São Paulo, Barueri, Alphaville, Belo Horizonte, Curitiba, Porto Alegre, Brasília, etc.).

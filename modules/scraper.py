@@ -233,10 +233,10 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
         print(f"[FILTRO CARGO] Vaga descartada por não ser das tecnologias alvo (COBOL, Mainframe, Java, Python, Trainee, n8n, Low-code/No-code ou Analista de Sistemas): '{vaga.get('titulo')}'")
         return False
 
-    # 6. Checagem de Nível Pleno: Permitido APENAS se for vaga de Automação / n8n / Low-code / No-code
+    # 6. Checagem de Nível Pleno: Permitido para Automação / n8n / Low-code / No-code / COBOL / Mainframe
     eh_pleno = bool(re.search(r'\b(pleno|pl\.?|mid\s*-?\s*level)\b', titulo, re.IGNORECASE))
-    if eh_pleno and not (eh_automacao or eh_low_no_code):
-        print(f"[FILTRO SENIORIDADE] Vaga de Pleno descartada (permitida apenas para Automação/n8n/Low-code/No-code): '{vaga.get('titulo')}'")
+    if eh_pleno and not (eh_automacao or eh_low_no_code or eh_cobol_mainframe):
+        print(f"[FILTRO SENIORIDADE] Vaga de Pleno descartada (permitida apenas para Automação/n8n/Low-code/No-code/COBOL/Mainframe): '{vaga.get('titulo')}'")
         return False
 
     return True
@@ -497,6 +497,7 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
         "Desenvolvedor Python Junior Brasil",
         "Analista de Sistemas Junior Brasil",
         "Desenvolvedor COBOL Mainframe Brasil",
+        "Analista COBOL Mainframe Brasil",
         "Trainee TI Brasil",
         "n8n automacao Brasil",
         "low code no code Brasil"
