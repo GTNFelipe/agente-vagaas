@@ -18,14 +18,14 @@ agente-vagaas/
 ├── modules/
 │   ├── __init__.py
 │   ├── scraper.py             # Varredura multicanal (SerpAPI, Programathor, GitHub, RSS) + Deep Scraping
-│   ├── tailor.py              # Análise de aderência e customização ATS via Groq LLM
-│   ├── pdf_generator.py       # Gerador de currículo em PDF limpo via ReportLab
+│   ├── tailor.py              # Análise de aderência, customização ATS e higienização factual via Groq LLM
+│   ├── pdf_generator.py       # Gerador de currículo em PDF limpo e factual via ReportLab
 │   ├── dossier.py             # Gerador de Dossiê de Preparação para Entrevistas (Markdown)
 │   ├── cover_letter.py        # Gerador de Carta de Apresentação Profissional (TXT)
 │   ├── database.py            # Persistência, sanitização e sincronização de dados no Supabase
 │   ├── notifier.py            # Envio de Auto-Apply por Gmail SMTP e notificações no Telegram
 │   └── telegram_bot.py        # Bot Interativo do Telegram com Trava de Instância Única (Socket Lock)
-├── master_profile.json        # Perfil profissional mestre do candidato (Fonte da Verdade)
+├── master_profile.json        # Perfil profissional mestre do candidato (Fonte Única da Verdade)
 ├── vagas_processadas.json     # Cache local anti-duplicata
 ├── schema_supabase.sql        # Script DDL completo de tabelas e permissões do Supabase
 ├── weekly_report.py           # Script de geração do relatório semanal (E-mail + Telegram)
@@ -51,6 +51,13 @@ agente-vagaas/
    - `flutterbr/vagas` (Mobile Flutter)
    - `vuejs-br/vagas` (Frontend/Fullstack Vue.js)
 4. **Feeds RSS Tech**: Varredura contínua em feeds de vagas remotas (RemoteOK, WeWorkRemotely, Remotive, Jobspress, WorkingNomads).
+
+---
+
+### 🛡️ Regra de Veracidade Absoluta (Zero Mentiras / Zero Alucinação)
+- **Fonte Única da Verdade (`master_profile.json`)**: O gerador de currículos e cartas de apresentação é estritamente limitado ao histórico factual do candidato.
+- **Bloqueio Factual de Ferramentas**: É terminantemente proibida a invenção de ferramentas ou linguagens inexistentes no perfil mestre (ex: *Cypress, Playwright, Selenium, RestAssured, React Native, Angular, Kubernetes* nunca são inseridos no currículo).
+- **Higienização em Camadas (Python Post-Processing)**: Em `modules/tailor.py` e `modules/pdf_generator.py`, qualquer habilidade sugerida pela IA que não esteja presente no conjunto de competências reais do candidato é sumariamente descartada pelo código antes da geração do PDF.
 
 ---
 
@@ -190,11 +197,11 @@ Interaja com o robô em tempo real enviando os comandos:
 
 ## 🛡️ Conformidade & Auditoria GRC (Governance, Risk & Compliance)
 
+- **Veracidade Factual Absoluta**: Garantia de zero invenções de competências ou mentiras em currículos, mantendo integridade factual perante o mercado e órgãos reguladores.
 - **Sincronização de Fuso Horário**: Todos os relatórios utilizam o Horário de Brasília (BRT / UTC-3), garantindo que as contagens de vagas batam 100% entre a nuvem (GitHub Actions) e o seu Telegram.
-- **Proteção contra Injeção HTML**: Aplicação obrigatoria de `html.escape` nas entradas web para prevenir erros de parse na API do Telegram.
+- **Proteção contra Injeção HTML**: Aplicação obrigatória de `html.escape` nas entradas web para prevenir erros de parse na API do Telegram.
 - **Sanitização de URLs de Banco**: O sistema higieniza URLs e chaves removendo aspas e adicionando `https://` automaticamente.
 - **Formatação ATS-Friendly**: PDF gerado sem tabelas complexas ou elementos gráficos que prejudiquem a pontuação em robôs leitores de currículos.
-- **Zero Alucinação**: A IA gera adaptações limitando-se estritamente às informações factuais de `master_profile.json`.
 
 ---
 
