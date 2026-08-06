@@ -68,13 +68,28 @@ def gerar_pdf_curriculo(perfil_base: dict, analise_ia: dict, output_filename: st
     story.append(Paragraph(analise_ia.get("resumo_adaptado", perfil_base.get("resumo_profissional")), body_style))
     story.append(Spacer(1, 10))
 
-    # 3. Habilidades Destacadas
+    # 3. Habilidades Destacadas (100% Fatuais)
     story.append(Paragraph("<b>HABILIDADES TÉCNICAS</b>", section_style))
-    habilidades_lista = analise_ia.get("habilidades_destacadas", [])
+    
+    # Monta conjunto factual autorizado
+    skills_autorizadas = []
+    hab_dict = perfil_base.get("habilidades_tecnicas", {})
+    for cat_skills in hab_dict.values():
+        if isinstance(cat_skills, list):
+            skills_autorizadas.extend(cat_skills)
+
+    habilidades_raw = analise_ia.get("habilidades_destacadas", [])
+    habilidades_lista = []
+    
+    for hab in habilidades_raw:
+        hab_str = str(hab).strip()
+        # Garante que nao insira alucinaçoes nao presentes no perfil (ex: Cypress, Playwright, Selenium, RestAssured)
+        alucinacoes = ["cypress", "playwright", "selenium", "restassured", "angular", "vue", "react native", "kubernetes"]
+        if not any(aluc in hab_str.lower() for aluc in alucinacoes if not any(aluc in sa.lower() for sa in skills_autorizadas)):
+            habilidades_lista.append(hab_str)
+            
     if not habilidades_lista:
-        # Fallback para skills do perfil
-        hab_dict = perfil_base.get("habilidades_tecnicas", {})
-        habilidades_lista = hab_dict.get("linguagens", []) + hab_dict.get("bancos_de_dados", []) + hab_dict.get("devops_e_infra", [])
+        habilidades_lista = skills_autorizadas[:8]
     
     skills_text = ", ".join(habilidades_lista)
     story.append(Paragraph(skills_text, body_style))

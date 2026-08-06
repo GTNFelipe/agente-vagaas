@@ -26,11 +26,10 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
         raise ImportError("A biblioteca 'groq' nao esta instalada.")
 
     client = Groq(api_key=api_key)
-
     prompt = f"""
     Você é um especialista em Recrutamento, Seleção, Otimização de Currículos e Preparação para Entrevistas.
 
-    PERFIL PROFISSIONAL BASE:
+    PERFIL PROFISSIONAL BASE FACTUAL DO CANDIDATO (FONTE ÚNICA DA VERDADE):
     {json.dumps(perfil_json, ensure_ascii=False, indent=2)}
 
     DESCRIÇÃO DA VAGA DE EMPREGO:
@@ -39,22 +38,24 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
     SUA TAREFA:
     1. Calcule uma pontuação de aderência (match_score de 0 a 100) entre o perfil base e a vaga.
     2. Escreva uma breve justificativa para a pontuação.
-    3. Reescreva o resumo profissional (resumo_adaptado) de forma altamente personalizada para ESTA vaga específica. Destaque em 3 a 5 linhas as tecnologias, ferramentas, metodologias e experiências do perfil base que coincidem diretamente com os requisitos desta vaga, otimizando com as palavras-chave da vaga para passar em leitores ATS.
-    4. Reordene e selecione as habilidades técnicas do perfil base mais relevantes para essa vaga.
-    5. Escreva uma CARTA DE APRESENTAÇÃO profissional (cover_letter) curta, direta e convincente (máximo 3 parágrafos) em 1ª pessoa, pronta para ser enviada no corpo do e-mail ao recrutador.
-    6. Crie um DOSSIÊ DE PREPARAÇÃO PARA ENTREVISTA (dossie_entrevista) contendo:
-       - pontos_fortes: Principais trunfos factuais do candidato para destacar na entrevista.
-       - perguntas_provaveis: 3 perguntas técnicas/comportamentais prováveis com respostas sugeridas baseadas na experiência real do perfil base.
-       - perguntas_para_recrutador: 2 ou 3 perguntas estratégicas para o candidato fazer na entrevista.
-       - pitch_elevador: Um resumo verbal convincente de 1 minuto para se apresentar no início da entrevista.
-    7. REGRA RÍGIDA: NUNCA invente habilidades, empresas ou experiências que não estejam no perfil base.
+    3. Reescreva o resumo profissional (resumo_adaptado) de forma altamente personalizada para ESTA vaga específica.
+    
+    ⚠️ REGRA DE INTEGRIDADE E VERACIDADE ABSOLUTA (MANDATÓRIO / ZERO MENTIRAS):
+    - É ESTRITAMENTE PROIBIDO INVENTAR OU ADICIONAR QUALQUER FERRAMENTA, LINGUAGEM, FRAMEWORK, EMPRESA OU EXPERIÊNCIA que NÃO esteja presente no PERFIL PROFISSIONAL BASE acima.
+    - JAMAIS invente ferramentas como Cypress, Playwright, Selenium, RestAssured, Angular, Vue, React, Kubernetes ou equivalentes se elas NÃO constarem no perfil base do candidato!
+    - Use APENAS as tecnologias e experiências reais descritas no perfil base (ex: Python, Java, COBOL, JCL, DB2, CICS, TSO, n8n, Docker, Linux, Git, Postgres, Supabase, Redis, Jira, Confluence, etc.).
+    - Destaque as tecnologias e experiências DO PERFIL BASE que favorecem a vaga. Fale SEMPRE a verdade. Se o candidato não possui alguma tecnologia exigida pela vaga, foque exclusivamente nas habilidades reais e verdadeiras que ele possui que mais se aproximam. NUNCA MINTA.
+
+    4. Selecione e reordene APENAS as habilidades técnicas reais do perfil base que sejam relevantes para essa vaga.
+    5. Escreva uma CARTA DE APRESENTAÇÃO profissional (cover_letter) curta, direta e 100% verdadeira (máximo 3 parágrafos) em 1ª pessoa, pronta para ser enviada ao recrutador.
+    6. Crie um DOSSIÊ DE PREPARAÇÃO PARA ENTREVISTA (dossie_entrevista) factual.
 
     RETORNE ESTRITAMENTE UM JSON NO SEGUINTE FORMATO (Sem markdown em volta ou texto extra):
     {{
         "match_score": 85,
         "justificativa_match": "Explicação em uma frase",
-        "resumo_adaptado": "Resumo profissional totalmente customizado e otimizado com palavras-chave desta vaga específica",
-        "habilidades_destacadas": ["Skill 1", "Skill 2", "Skill 3"],
+        "resumo_adaptado": "Resumo profissional 100% verdadeiro customizado a favor da vaga com base no perfil factual",
+        "habilidades_destacadas": ["Skill Real 1", "Skill Real 2", "Skill Real 3"],
         "cover_letter": "Texto completo da carta de apresentação para o recrutador",
         "dossie_entrevista": {{
             "pontos_fortes": ["Ponto 1", "Ponto 2", "Ponto 3"],
@@ -72,15 +73,47 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
     max_tentativas = 3
     tempo_espera = 15
 
+    # Monta a lista completa de skills factuais do perfil mestre para validação
+    skills_factuais = set()
+    hab_dict = perfil_json.get("habilidades_tecnicas", {})
+    for cat in hab_dict.values():
+        if isinstance(cat, list):
+            for item in cat:
+                skills_factuais.add(item.lower().strip())
+    
+    # Adiciona tecnologias de experiencias
+    for exp in perfil_json.get("experiencias", []):
+        for tech in exp.get("tecnologias", []):
+            skills_factuais.add(tech.lower().strip())
+
     for tentativa in range(1, max_tentativas + 1):
         try:
             response = client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
+                temperature=0.1,
                 response_format={"type": "json_object"}
             )
-            return json.loads(response.choices[0].message.content)
+            resultado = json.loads(response.choices[0].message.content)
+            
+            # POS-PROCESSAMENTO E HIGIENIZACAO DE SEGURANÇA:
+            # Remove qualquer habilidade alucinada que nao exista no master_profile.json
+            hab_raw = resultado.get("habilidades_destacadas", [])
+            hab_validas = []
+            for item in hab_raw:
+                item_str = str(item).strip()
+                # Valida se contem termos autorizados do perfil
+                if any(skill in item_str.lower() for skill in skills_factuais) or len(hab_validas) < 3:
+                    # Remove alucinações conhecidas se nao estiverem no perfil
+                    alucinacoes_bloqueadas = ["cypress", "playwright", "selenium", "restassured", "angular", "vue", "react native", "kubernetes"]
+                    if not any(aluc in item_str.lower() for aluc in alucinacoes_bloqueadas if not any(aluc in sf for sf in skills_factuais)):
+                        hab_validas.append(item_str)
+            
+            if hab_validas:
+                resultado["habilidades_destacadas"] = hab_validas
+
+            return resultado
+
         except RateLimitError as e:
             if tentativa < max_tentativas:
                 msg_aviso = f"⚠️ Limite de taxa da Groq atingido. Aguardando {tempo_espera}s para tentar novamente ({tentativa}/{max_tentativas})..."
