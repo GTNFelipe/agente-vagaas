@@ -135,6 +135,8 @@ def comando_buscar(chat_id: str):
         main.main()
         enviar_mensagem_telegram(chat_id, "✅ <b>[BUSCA CONCLUÍDA]</b> Varredura finalizada com sucesso! Se houverem novas vagas qualificadas, elas já foram enviadas acima.")
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         enviar_mensagem_telegram(chat_id, f"❌ <b>[ERRO NA BUSCA]</b> Falha ao executar varredura: {e}")
     finally:
         BUSCA_EM_ANDAMENTO = False

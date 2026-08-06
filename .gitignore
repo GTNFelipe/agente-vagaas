@@ -10,3 +10,5 @@ __pycache__/
 curriculos_gerados/
 dossies_vagas/
 cartas_apresentacao/
+master_profile.json
+vagas_processadas.json

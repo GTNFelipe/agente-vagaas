@@ -25,10 +25,10 @@ def gerar_relatorio_semanal():
         scores = [v.get("match_score", 0) for v in dados if v.get("match_score")]
         media_score = round(sum(scores) / len(scores), 1) if scores else 0
 
-        remetente = os.getenv("GMAIL_USER") or "felipestartt@gmail.com"
+        remetente = os.getenv("GMAIL_USER")
         senha_app = os.getenv("GMAIL_APP_PASSWORD")
-        if not senha_app:
-            print("[AVISO] GMAIL_APP_PASSWORD nao configurada. Relatorio nao enviado.")
+        if not remetente or not senha_app:
+            print("[AVISO] GMAIL_USER ou GMAIL_APP_PASSWORD nao configurada. Relatorio por e-mail nao enviado.")
             return
 
         destinatario = os.getenv("NOTIFY_EMAIL") or remetente

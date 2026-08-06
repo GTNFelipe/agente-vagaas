@@ -196,11 +196,12 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
             print(f"[FILTRO SENIORIDADE ALTA] Vaga descartada por ser de nível Sênior/Lead ({sen}): '{vaga.get('titulo')}'")
             return False
 
-    # 3. Validação de Título: Deve se enquadrar como Desenvolvedor/Programador/Engenheiro ou Analista
+    # 3. Validação de Título: Deve se enquadrar como Desenvolvedor/Programador/Engenheiro ou Analista/Trainee/Low-code
     padroes_titulo_dev_analista = [
         r'\bdesenvolvedor[a]?\b', r'\bdeveloper\b', r'\bprogramador[a]?\b', r'\bprogrammer\b',
         r'\bsoftware\s+engineer\b', r'\bengenheiro[a]?\s+de\s+software\b',
-        r'\banalista\b', r'\bautoma[cç][aã]o\b', r'\bn8n\b'
+        r'\banalista\b', r'\bautoma[cç][aã]o\b', r'\bn8n\b', r'\btrainee\b',
+        r'\bno\s*-?\s*code\b', r'\blow\s*-?\s*code\b', r'\bvibe\s*code\b'
     ]
 
     tem_titulo_dev_analista = any(re.search(ptd, titulo, re.IGNORECASE) for ptd in padroes_titulo_dev_analista)
@@ -216,23 +217,26 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
     eh_automacao = bool(re.search(r'\b(n8n|automa[cç][aã]o)\b', texto_completo, re.IGNORECASE))
     eh_cobol_mainframe = bool(re.search(r'\b(cobol|mainframe)\b', texto_completo, re.IGNORECASE))
     eh_java = bool(re.search(r'\bjava(?!\s*script)\b', texto_completo, re.IGNORECASE))
+    eh_python = bool(re.search(r'\bpython\b', texto_completo, re.IGNORECASE))
+    eh_trainee = bool(re.search(r'\btrainee\b', texto_completo, re.IGNORECASE))
+    eh_low_no_code = bool(re.search(r'\b(no\s*-?\s*code|low\s*-?\s*code|vibe\s*code)\b', texto_completo, re.IGNORECASE))
 
     for stack in stacks_incompativeis_titulo:
-        if re.search(stack, titulo, re.IGNORECASE) and not (eh_automacao or eh_cobol_mainframe):
+        if re.search(stack, titulo, re.IGNORECASE) and not (eh_automacao or eh_cobol_mainframe or eh_low_no_code):
             print(f"[FILTRO STACK INCOMPATÍVEL] Vaga descartada por ser de tecnologia diferente do perfil ({stack}): '{vaga.get('titulo')}'")
             return False
 
-    # 5. Identifica se a vaga é de Automação / n8n, COBOL, Mainframe, Java ou Analista de Sistemas
+    # 5. Identifica se a vaga é de Automação / n8n, COBOL, Mainframe, Java, Python, Trainee, Low-code/No-code ou Analista de Sistemas
     eh_analista_sistemas = bool(re.search(r'\banalista\s+de\s+sistemas\b', texto_completo, re.IGNORECASE))
 
-    if not (eh_automacao or eh_cobol_mainframe or eh_java or eh_analista_sistemas):
-        print(f"[FILTRO CARGO] Vaga descartada por não ser das tecnologias alvo (COBOL, Mainframe, Java, n8n ou Analista de Sistemas): '{vaga.get('titulo')}'")
+    if not (eh_automacao or eh_cobol_mainframe or eh_java or eh_analista_sistemas or eh_python or eh_trainee or eh_low_no_code):
+        print(f"[FILTRO CARGO] Vaga descartada por não ser das tecnologias alvo (COBOL, Mainframe, Java, Python, Trainee, n8n, Low-code/No-code ou Analista de Sistemas): '{vaga.get('titulo')}'")
         return False
 
-    # 6. Checagem de Nível Pleno: Permitido APENAS se for vaga de Automação / n8n
+    # 6. Checagem de Nível Pleno: Permitido APENAS se for vaga de Automação / n8n / Low-code / No-code
     eh_pleno = bool(re.search(r'\b(pleno|pl\.?|mid\s*-?\s*level)\b', titulo, re.IGNORECASE))
-    if eh_pleno and not eh_automacao:
-        print(f"[FILTRO SENIORIDADE] Vaga de Pleno descartada (permitida apenas para Automação/n8n): '{vaga.get('titulo')}'")
+    if eh_pleno and not (eh_automacao or eh_low_no_code):
+        print(f"[FILTRO SENIORIDADE] Vaga de Pleno descartada (permitida apenas para Automação/n8n/Low-code/No-code): '{vaga.get('titulo')}'")
         return False
 
     return True
@@ -490,9 +494,12 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     # Buscas direcionadas no Google Jobs por categoria/tecnologia
     queries_google = [
         "Desenvolvedor Java Junior Brasil",
+        "Desenvolvedor Python Junior Brasil",
         "Analista de Sistemas Junior Brasil",
         "Desenvolvedor COBOL Mainframe Brasil",
-        "n8n automacao Brasil"
+        "Trainee TI Brasil",
+        "n8n automacao Brasil",
+        "low code no code Brasil"
     ]
 
     print("[BUSCA GOOGLE JOBS] Disparando pesquisas direcionadas no Google Jobs via SerpAPI...")

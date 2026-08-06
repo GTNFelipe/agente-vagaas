@@ -1,0 +1,87 @@
+{
+  "nome": "Seu Nome Completo",
+  "cargo_atual": "Seu Cargo Atual / Área de Atuação",
+  "localizacao": "Cidade, Estado",
+  "contato": {
+    "email": "seu_email@exemplo.com",
+    "phone": "5521999999999",
+    "linkedin": "https://linkedin.com/in/seu_perfil",
+    "github": "https://github.com/seu_usuario"
+  },
+  "cargos_alvo": [
+    "Cargo Alvo 1",
+    "Cargo Alvo 2",
+    "Cargo Alvo 3"
+  ],
+  "modalidades_aceitas": [
+    "Remoto",
+    "Híbrido (Sua Cidade)"
+  ],
+  "resumo_profissional": "Resumo factual do seu perfil profissional, descrevendo suas principais experiências e competências...",
+  "habilidades_tecnicas": {
+    "linguagens": [
+      "Python",
+      "JavaScript",
+      "Java"
+    ],
+    "bancos_de_dados": [
+      "Postgres",
+      "Supabase",
+      "Redis"
+    ],
+    "ia_e_automacao": [
+      "n8n",
+      "OpenAI API",
+      "Groq API"
+    ],
+    "devops_e_infra": [
+      "Docker",
+      "Linux",
+      "Git",
+      "GitHub"
+    ],
+    "mainframe_e_alm": [],
+    "gestao_e_metodologias": [
+      "Scrum",
+      "Kanban",
+      "Jira"
+    ]
+  },
+  "experiencias": [
+    {
+      "empresa": "Nome da Empresa",
+      "cargo": "Seu Cargo",
+      "periodo": "01/2024 - Atual",
+      "detalhes": [
+        "Descrição detalhada da atividade ou conquista 1.",
+        "Descrição detalhada da atividade ou conquista 2."
+      ],
+      "tecnologias": [
+        "Tecnologia1",
+        "Tecnologia2"
+      ]
+    }
+  ],
+  "formacao": [
+    {
+      "curso": "Nome do Curso / Graduação",
+      "instituicao": "Nome da Instituição de Ensino",
+      "conclusao": "MM/AAAA"
+    }
+  ],
+  "idiomas": [
+    {
+      "idioma": "Português",
+      "nivel": "Nativo"
+    },
+    {
+      "idioma": "Inglês",
+      "nivel": "Intermediário"
+    }
+  ],
+  "soft_skills": [
+    "Atenção aos Detalhes",
+    "Resolução de Problemas",
+    "Trabalho em Equipe"
+  ]
+}

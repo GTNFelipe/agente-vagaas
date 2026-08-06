@@ -10,18 +10,18 @@ def gerar_arquivo_carta_apresentacao(vaga_info: dict, analise_ia: dict, perfil_b
 
     titulo = vaga_info.get("titulo", "Vaga_Desconhecida")
     empresa = vaga_info.get("empresa", "Empresa_Desconhecida")
-    clean_title = re.sub(r'[^\w\-_]', '_', str(titulo)).strip("_")
-    clean_empresa = re.sub(r'[^\w\-_]', '_', str(empresa)).strip("_")
+    clean_title = (re.sub(r'[^\w\-_]', '_', str(titulo)).strip("_")[:35]) or "Vaga"
+    clean_empresa = (re.sub(r'[^\w\-_]', '_', str(empresa)).strip("_")[:30]) or "Empresa"
     nome_arquivo = f"Carta_Apresentacao_{clean_title}_{clean_empresa}.txt"
     caminho_arquivo = os.path.join(output_dir, nome_arquivo)
 
-    contato = perfil_base.get("contato", {})
-    nome = perfil_base.get("nome", "Felipe Santana da Silva")
-    email = contato.get("email", "felipestartt@gmail.com")
-    phone = contato.get("phone", "21969613192")
-    linkedin = contato.get("linkedin", "https://linkedin.com/in/gtnfelipe")
-    github = contato.get("github", "https://github.com/gtnfelipe")
-    localizacao = perfil_base.get("localizacao", "Rio de Janeiro, RJ")
+    contato = perfil_base.get("contato", {}) if perfil_base else {}
+    nome = perfil_base.get("nome", "Candidato") if perfil_base else "Candidato"
+    email = contato.get("email", "")
+    phone = contato.get("phone", "")
+    linkedin = contato.get("linkedin", "")
+    github = contato.get("github", "")
+    localizacao = perfil_base.get("localizacao", "") if perfil_base else ""
 
     carta_texto = analise_ia.get("cover_letter", "")
 

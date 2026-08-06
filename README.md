@@ -25,7 +25,8 @@ agente-vagaas/
 │   ├── database.py            # Persistência, sanitização e sincronização de dados no Supabase
 │   ├── notifier.py            # Envio de Auto-Apply por Gmail SMTP e notificações no Telegram
 │   └── telegram_bot.py        # Bot Interativo do Telegram com Trava de Instância Única (Socket Lock)
-├── master_profile.json        # Perfil profissional mestre do candidato (Fonte Única da Verdade)
+├── master_profile.sample.json # Modelo de perfil sem informações sensíveis (Template)
+├── master_profile.json        # Perfil mestre real do candidato (No .gitignore / Dados Sensíveis)
 ├── vagas_processadas.json     # Cache local anti-duplicata
 ├── schema_supabase.sql        # Script DDL completo de tabelas e permissões do Supabase
 ├── weekly_report.py           # Script de geração do relatório semanal (E-mail + Telegram)
@@ -33,6 +34,7 @@ agente-vagaas/
 ├── requirements.txt           # Dependências do projeto
 └── README.md                  # Documentação completa do projeto
 ```
+
 
 ---
 
@@ -63,7 +65,7 @@ agente-vagaas/
 
 ### 🕵️‍♂️ Deep Scraping & Auto-Apply Inteligente
 - **Deep Scraping de Contatos**: Investiga o HTML da página oficial da vaga para extrair e-mails diretos de recrutadores (`recrutamento@`, `rh@`, `vagas@`, `talent@`).
-- **Auto-Apply por E-mail**: Se o e-mail de RH for identificado, o robô dispara a candidatura **100% no automático**, anexando o PDF `CV_Felipe_Santana_[Empresa].pdf` e enviando uma cópia de confirmação para o e-mail do próprio candidato (`felipestartt@gmail.com`).
+- **Auto-Apply por E-mail**: Se o e-mail de RH for identificado, o robô dispara a candidatura **100% no automático**, anexando o PDF `CV_[Nome]_[Empresa].pdf` e enviando uma cópia de confirmação para o e-mail do próprio candidato.
 - **Gestão de Limpeza**: Deleta os PDFs e arquivos temporários do disco local após a notificação, mantendo a cópia e o histórico salvos 100% no Supabase.
 
 ---
@@ -153,6 +155,95 @@ GRANT ALL ON public.vagas_processadas TO anon, authenticated, service_role;
 GRANT ALL ON public.curriculos_gerados TO anon, authenticated, service_role;
 GRANT ALL ON public.prep_dossies TO anon, authenticated, service_role;
 ```
+
+
+---
+
+## 👤 Modelo do Perfil Mestre (`master_profile.sample.json`)
+
+Por conter dados pessoais sensíveis (como telefone, e-mail, histórico profissional e links), o arquivo **`master_profile.json`** está presente no `.gitignore` e **NÃO é commitado no repositório**.
+
+Para uso local, crie o arquivo `master_profile.json` na raiz do projeto utilizando a estrutura base abaixo:
+
+```json
+{
+  "nome": "Seu Nome Completo",
+  "cargo_atual": "Seu Cargo Atual / Área de Atuação",
+  "localizacao": "Cidade, Estado",
+  "contato": {
+    "email": "seu_email@exemplo.com",
+    "phone": "5521999999999",
+    "linkedin": "https://linkedin.com/in/seu_perfil",
+    "github": "https://github.com/seu_usuario"
+  },
+  "cargos_alvo": [
+    "Cargo Alvo 1",
+    "Cargo Alvo 2",
+    "Cargo Alvo 3"
+  ],
+  "modalidades_aceitas": [
+    "Remoto",
+    "Híbrido (Sua Cidade)"
+  ],
+  "resumo_profissional": "Resumo factual do seu perfil profissional, descrevendo suas principais experiências e competências...",
+  "habilidades_tecnicas": {
+    "linguagens": ["Python", "JavaScript", "Java"],
+    "bancos_de_dados": ["Postgres", "Supabase", "Redis"],
+    "ia_e_automacao": ["n8n", "OpenAI API", "Groq API"],
+    "devops_e_infra": ["Docker", "Linux", "Git", "GitHub"],
+    "mainframe_e_alm": [],
+    "gestao_e_metodologias": ["Scrum", "Kanban", "Jira"]
+  },
+  "experiencias": [
+    {
+      "empresa": "Nome da Empresa",
+      "cargo": "Seu Cargo",
+      "periodo": "01/2024 - Atual",
+      "detalhes": [
+        "Descrição detalhada da atividade ou conquista 1.",
+        "Descrição detalhada da atividade ou conquista 2."
+      ],
+      "tecnologias": ["Tecnologia1", "Tecnologia2"]
+    }
+  ],
+  "formacao": [
+    {
+      "curso": "Nome do Curso / Graduação",
+      "instituicao": "Nome da Instituição de Ensino",
+      "conclusao": "MM/AAAA"
+    }
+  ],
+  "idiomas": [
+    {
+      "idioma": "Português",
+      "nivel": "Nativo"
+    },
+    {
+      "idioma": "Inglês",
+      "nivel": "Intermediário"
+    }
+  ],
+  "soft_skills": [
+    "Atenção aos Detalhes",
+    "Resolução de Problemas",
+    "Trabalho em Equipe"
+  ]
+}
+```
+
+---
+
+## 🔑 Configuração no GitHub Secrets & Variables
+
+Para que as automações no **GitHub Actions** funcionem na nuvem sem expor seus dados pessoais:
+
+1. Acesse o seu repositório no GitHub.
+2. Vá em **Settings** ➔ **Secrets and variables** ➔ **Actions**.
+3. Em **Repository secrets**, clique no botão **New repository secret**.
+4. Preencha os campos:
+   - **Name**: `MASTER_PROFILE_JSON`
+   - **Secret**: cole o conteúdo JSON completo do seu `master_profile.json` (formatado).
+5. Clique em **Add secret**.
 
 ---
 

@@ -29,8 +29,13 @@ from modules.notifier import realizar_candidatura_auto_email, enviar_notificacao
 load_dotenv()
 
 def carregar_perfil_base() -> dict:
-    with open("master_profile.json", "r", encoding="utf-8") as f:
-        return json.load(f)
+    if os.environ.get("MASTER_PROFILE_JSON"):
+        return json.loads(os.environ["MASTER_PROFILE_JSON"])
+    if os.path.exists("master_profile.json"):
+        with open("master_profile.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    raise FileNotFoundError("Perfil mestre não encontrado. Defina a variável MASTER_PROFILE_JSON ou crie o arquivo master_profile.json.")
+
 
 def extrair_email_texto(texto: str) -> str:
     emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', texto)
@@ -71,12 +76,13 @@ def main():
         print(f"[SCORE] Score de Match: {match_score}%")
 
         if match_score >= 80:
-            clean_empresa = re.sub(r'[^\w\-_]', '_', str(vaga.get("empresa", "Empresa"))).strip("_")
+            clean_empresa = (re.sub(r'[^\w\-_]', '_', str(vaga.get("empresa", "Empresa"))).strip("_")[:30]) or "Empresa"
             
             # 1. Gerar e SALVAR o PDF do Currículo Otimizado em pasta dedicada
             pasta_cvs = "curriculos_gerados"
             os.makedirs(pasta_cvs, exist_ok=True)
-            nome_arquivo_pdf = f"CV_Felipe_Santana_{clean_empresa}.pdf"
+            nome_candidato_clean = (re.sub(r'[^\w\-_]', '_', str(perfil_base.get("nome", "Candidato"))).strip("_")[:30]) or "Candidato"
+            nome_arquivo_pdf = f"CV_{nome_candidato_clean}_{clean_empresa}.pdf"
             caminho_pdf = os.path.join(pasta_cvs, nome_arquivo_pdf)
             gerar_pdf_curriculo(perfil_base, analise, output_filename=caminho_pdf)
 

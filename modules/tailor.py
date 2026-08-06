@@ -137,7 +137,7 @@ def _fallback_adaptacao(perfil_json: dict, descricao_vaga: str) -> dict:
             "PostgreSQL & Supabase",
             "Sistemas Backend & Mainframe (COBOL)"
         ],
-        "cover_letter": "Prezado(a) Recrutador(a),\n\nTenho grande interesse na oportunidade. Possuo sólida experiência em desenvolvimento backend com Python, criação de APIs RESTful e automação de processos corporativos.\n\nFico à disposição para agendarmos uma conversa.\n\nAtenciosamente,\nFelipe Santana da Silva",
+        "cover_letter": f"Prezado(a) Recrutador(a),\n\nTenho grande interesse na oportunidade. Possuo sólida experiência em desenvolvimento backend com Python, criação de APIs RESTful e automação de processos corporativos.\n\nFico à disposição para agendarmos uma conversa.\n\nAtenciosamente,\n{perfil_json.get('nome', 'Candidato')}",
         "dossie_entrevista": {
             "pontos_fortes": [
                 "Experiência prática na modernização de 62 programas COBOL/Mainframe no Bradesco.",

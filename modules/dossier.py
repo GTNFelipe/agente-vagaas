@@ -11,8 +11,8 @@ def gerar_dossie_vaga(vaga_info: dict, analise_ia: dict, output_dir: str = "doss
 
     titulo = vaga_info.get("titulo", "Vaga_Desconhecida")
     empresa = vaga_info.get("empresa", "Empresa_Desconhecida")
-    clean_title = re.sub(r'[^\w\-_]', '_', str(titulo)).strip("_")
-    clean_empresa = re.sub(r'[^\w\-_]', '_', str(empresa)).strip("_")
+    clean_title = (re.sub(r'[^\w\-_]', '_', str(titulo)).strip("_")[:35]) or "Vaga"
+    clean_empresa = (re.sub(r'[^\w\-_]', '_', str(empresa)).strip("_")[:30]) or "Empresa"
     nome_arquivo = f"Dossie_{clean_title}_{clean_empresa}.md"
     caminho_arquivo = os.path.join(output_dir, nome_arquivo)
 

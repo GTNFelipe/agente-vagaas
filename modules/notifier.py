@@ -6,33 +6,64 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
-def realizar_candidatura_auto_email(vaga_info: dict, analise_ia: dict, caminho_pdf: str) -> bool:
+def realizar_candidatura_auto_email(vaga_info: dict, analise_ia: dict, caminho_pdf: str, perfil_base: dict = None) -> bool:
     """
     Envia o e-mail de candidatura DIRETO para o recrutador e envia uma CÓPIA para o candidato.
     """
-    remetente = os.getenv("GMAIL_USER") or "felipestartt@gmail.com"
+    remetente = os.getenv("GMAIL_USER")
     senha_app = os.getenv("GMAIL_APP_PASSWORD")
     email_recrutador = vaga_info.get("email_candidatura")
 
-    if not senha_app or not email_recrutador:
+    if not remetente or not senha_app or not email_recrutador:
         return False
 
-    assunto = f"Candidatura: {vaga_info.get('titulo')} - Felipe Santana da Silva"
+    contato = perfil_base.get("contato", {}) if perfil_base else {}
+    nome_candidato = perfil_base.get("nome", "Candidato") if perfil_base else "Candidato"
+    cargo_candidato = perfil_base.get("cargo_atual", "") if perfil_base else ""
+    localizacao = perfil_base.get("localizacao", "") if perfil_base else ""
+    phone = contato.get("phone", "")
+    email_candidato = contato.get("email", remetente)
+    linkedin = contato.get("linkedin", "")
+    github = contato.get("github", "")
+
+    assunto = f"Candidatura: {vaga_info.get('titulo')} - {nome_candidato}"
     
     cover_text = analise_ia.get('cover_letter', '').replace('\n', '<br>')
     
+    info_rodape = []
+    if cargo_candidato:
+        info_rodape.append(html.escape(cargo_candidato))
+    contatos_linha = []
+    if localizacao:
+        contatos_linha.append(html.escape(localizacao))
+    if phone:
+        contatos_linha.append(html.escape(phone))
+    
+    links_linha = []
+    if email_candidato:
+        links_linha.append(f"Email: {html.escape(email_candidato)}")
+    if linkedin:
+        links_linha.append(f"LinkedIn: {html.escape(linkedin)}")
+    if github:
+        links_linha.append(f"GitHub: {html.escape(github)}")
+
+    rodape_html = f"<b>{html.escape(nome_candidato)}</b><br>"
+    if info_rodape:
+        rodape_html += f"{' | '.join(info_rodape)}<br>"
+    if contatos_linha:
+        rodape_html += f"{' | '.join(contatos_linha)}<br>"
+    if links_linha:
+        rodape_html += f"{' | '.join(links_linha)}"
+
     corpo_html_recrutador = f"""
     <div style="font-family: Arial, sans-serif; color: #2D3748; line-height: 1.6;">
-        <p>Prezado(a) Recrutador(a) / Equipe de Seleção da <b>{vaga_info.get('empresa')}</b>,</p>
+        <p>Prezado(a) Recrutador(a) / Equipe de Seleção da <b>{html.escape(str(vaga_info.get('empresa', '')))}</b>,</p>
         
         {cover_text}
         
         <br>
         <hr style="border: 0; border-top: 1px solid #E2E8F0;">
-        <p><b>Felipe Santana da Silva</b><br>
-        Trainee TI / Desenvolvedor Backend<br>
-        Rio de Janeiro, RJ | (21) 96961-3192<br>
-        Email: felipestartt@gmail.com | LinkedIn: https://linkedin.com/in/gtnfelipe | GitHub: https://github.com/gtnfelipe</p>
+        <p>{rodape_html}</p>
         <p><i>📎 O currículo completo em formato PDF encontra-se em anexo nesta mensagem.</i></p>
     </div>
     """
@@ -47,8 +78,7 @@ def realizar_candidatura_auto_email(vaga_info: dict, analise_ia: dict, caminho_p
     if caminho_pdf and os.path.exists(caminho_pdf):
         with open(caminho_pdf, "rb") as f:
             pdf_attachment = MIMEApplication(f.read(), _subtype="pdf")
-            clean_empresa = re.sub(r'[^\w\-_]', '_', str(vaga_info.get('empresa', 'Empresa'))).strip("_")
-            filename = f"CV_Felipe_Santana_{clean_empresa}.pdf"
+            filename = os.path.basename(caminho_pdf)
             pdf_attachment.add_header('Content-Disposition', 'attachment', filename=filename)
             msg.attach(pdf_attachment)
 
@@ -69,7 +99,8 @@ def enviar_notificacao_telegram(vaga_info: dict, analise_ia: dict, caminho_pdf: 
     """
     import requests
     token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID") or "5610262269"
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
 
     if not token or not chat_id:
         print("⚠️ Credentials do Telegram não configuradas (TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID). Pulando notificação no Telegram.")
