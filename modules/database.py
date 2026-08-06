@@ -21,10 +21,18 @@ def inicializar_supabase() -> Optional[Client]:
     else:
         load_dotenv(override=True)
 
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY")
+    raw_url = os.getenv("SUPABASE_URL", "")
+    raw_key = os.getenv("SUPABASE_KEY", "")
+
+    # Higieniza espaços, aspas simples/duplas acidentais
+    url = raw_url.strip().strip('"').strip("'")
+    key = raw_key.strip().strip('"').strip("'")
+
+    if url and not (url.startswith("http://") or url.startswith("https://")):
+        url = f"https://{url}"
+
     if not url or not key or create_client is None:
-        print(f"[AVISO] SUPABASE_URL ou SUPABASE_KEY nao encontradas nas variaveis de ambiente (base_dir: {base_dir}).")
+        print(f"[AVISO] SUPABASE_URL ou SUPABASE_KEY nao encontradas nas variaveis de ambiente.")
         return None
     try:
         return create_client(url, key)
