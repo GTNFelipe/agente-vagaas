@@ -139,14 +139,14 @@ def comando_buscar(chat_id: str):
     finally:
         BUSCA_EM_ANDAMENTO = False
 
-def gerar_relatorio_diario_telegram() -> str:
+def gerar_relatorio_diario_telegram(automatico: bool = False) -> str:
     """Gera o resumo diário de desempenho (Daily Digest) consultando o Supabase e com fallback local."""
     from datetime import datetime, timezone, timedelta
     
     # Define Horário de Brasília (UTC-3)
     fuso_brt = timezone(timedelta(hours=-3))
     agora_brt = datetime.now(fuso_brt)
-    data_brt_str = agora_brt.strftime("%d/%m/%Y")
+    data_brt_str = agora_brt.strftime("%d/%m/%Y às %H:%M")
 
     # Calcula o início do dia no Horário de Brasília convertido para UTC (para consulta no Supabase)
     inicio_dia_brt = agora_brt.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -190,8 +190,15 @@ def gerar_relatorio_diario_telegram() -> str:
     restantes = info_serp.get("restantes", "N/A")
     limite = info_serp.get("limite", 250)
 
-    mensagem = f"""📊 <b>[RESUMO DIÁRIO DO AGENTE DE VAGAS]</b>
-📅 <b>Data:</b> {data_brt_str} (<i>{fonte_dados}</i>)
+    if automatico:
+        cabecalho = "🤖 <b>[RELATÓRIO DIÁRIO AUTOMÁTICO - DIGEST DIÁRIO]</b>"
+        rodape = "⏰ <i>Relatório automático disparado pela rotina das 20:00.</i>"
+    else:
+        cabecalho = "⚡ <b>[RELATÓRIO SOB DEMANDA - /relatorio]</b>"
+        rodape = "💡 <i>Relatório gerado instantaneamente a seu pedido via Telegram.</i>"
+
+    mensagem = f"""{cabecalho}
+📅 <b>Emitido em:</b> {data_brt_str} (<i>{fonte_dados}</i>)
 
 🔍 <b>Vagas Analisadas Hoje:</b> {total_proc_hoje}
 🎯 <b>Vagas Qualificadas Hoje (Match >= 80%):</b> {qualificadas_hoje}
@@ -201,7 +208,7 @@ def gerar_relatorio_diario_telegram() -> str:
 • <b>Pesquisas Usadas Este Mês:</b> {usadas} / {limite}
 • <b>Pesquisas Restantes:</b> {restantes}
 
-🟢 <i>O robô continuará as varreduras diárias normalmente!</i>"""
+{rodape}"""
     return mensagem
 
 def processar_mensagem(update: dict):

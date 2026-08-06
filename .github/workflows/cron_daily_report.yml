@@ -30,4 +30,4 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python -c "from modules.telegram_bot import gerar_relatorio_diario_telegram, enviar_mensagem_telegram, TELEGRAM_CHAT_ID; enviar_mensagem_telegram(TELEGRAM_CHAT_ID, gerar_relatorio_diario_telegram())"
+          python -c "from modules.telegram_bot import gerar_relatorio_diario_telegram, enviar_mensagem_telegram, TELEGRAM_CHAT_ID; enviar_mensagem_telegram(TELEGRAM_CHAT_ID, gerar_relatorio_diario_telegram(automatico=True))"
