@@ -435,11 +435,21 @@ def buscar_vagas_programathor() -> list:
 
 def buscar_vagas_github_repos() -> list:
     """
-    Busca vagas em tempo real nos repositórios/fóruns de comunidades tech do GitHub (backend-br/vagas e soujava/vagas).
+    Busca vagas em tempo real nos repositórios e fóruns de comunidades tech do Brasil no GitHub.
+    Fontes: backend-br, frontendbr, react-brasil, qa-brasil, androiddevbr, phpdevbr, flutterbr e vuejs-br.
     Não consome cota do SerpAPI!
     """
     vagas_github = []
-    repos = ["backend-br/vagas", "soujava/vagas"]
+    repos = [
+        "backend-br/vagas",
+        "frontendbr/vagas",
+        "react-brasil/vagas",
+        "qa-brasil/vagas",
+        "androiddevbr/vagas",
+        "phpdevbr/vagas",
+        "flutterbr/vagas",
+        "vuejs-br/vagas"
+    ]
     headers = {
         "User-Agent": "AgenteVagasBot",
         "Accept": "application/vnd.github.v3+json"
