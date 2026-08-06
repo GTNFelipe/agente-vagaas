@@ -141,9 +141,16 @@ def comando_buscar(chat_id: str):
 
 def gerar_relatorio_diario_telegram() -> str:
     """Gera o resumo diário de desempenho (Daily Digest) consultando o Supabase e com fallback local."""
-    from datetime import datetime
-    hoje_str = datetime.now().strftime("%Y-%m-%d")
-    hoje_inicio = f"{hoje_str} 00:00:00"
+    from datetime import datetime, timezone, timedelta
+    
+    # Define Horário de Brasília (UTC-3)
+    fuso_brt = timezone(timedelta(hours=-3))
+    agora_brt = datetime.now(fuso_brt)
+    data_brt_str = agora_brt.strftime("%d/%m/%Y")
+
+    # Calcula o início do dia no Horário de Brasília convertido para UTC (para consulta no Supabase)
+    inicio_dia_brt = agora_brt.replace(hour=0, minute=0, second=0, microsecond=0)
+    inicio_utc_str = inicio_dia_brt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     total_proc_hoje = 0
     qualificadas_hoje = 0
@@ -153,12 +160,12 @@ def gerar_relatorio_diario_telegram() -> str:
     supabase = inicializar_supabase()
     if supabase:
         try:
-            res_proc = supabase.table("vagas_processadas").select("id, status_candidatura, created_at").gte("created_at", hoje_inicio).execute()
+            res_proc = supabase.table("vagas_processadas").select("id, status_candidatura, created_at").gte("created_at", inicio_utc_str).execute()
             proc_hoje = res_proc.data or []
             total_proc_hoje = len(proc_hoje)
             auto_applies_hoje = sum(1 for item in proc_hoje if item.get("status_candidatura") == "candidatado_auto")
 
-            res_vagas = supabase.table("vagas").select("id, created_at").gte("created_at", hoje_inicio).execute()
+            res_vagas = supabase.table("vagas").select("id, created_at").gte("created_at", inicio_utc_str).execute()
             qualificadas_hoje = len(res_vagas.data or [])
         except Exception as e:
             print(f"[AVISO RELATORIO] Erro ao consultar Supabase, usando fallback local: {e}")
@@ -184,7 +191,7 @@ def gerar_relatorio_diario_telegram() -> str:
     limite = info_serp.get("limite", 250)
 
     mensagem = f"""📊 <b>[RESUMO DIÁRIO DO AGENTE DE VAGAS]</b>
-📅 <b>Data:</b> {datetime.now().strftime('%d/%m/%Y')} (<i>{fonte_dados}</i>)
+📅 <b>Data:</b> {data_brt_str} (<i>{fonte_dados}</i>)
 
 🔍 <b>Vagas Analisadas Hoje:</b> {total_proc_hoje}
 🎯 <b>Vagas Qualificadas Hoje (Match >= 80%):</b> {qualificadas_hoje}
