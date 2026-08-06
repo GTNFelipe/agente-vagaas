@@ -148,6 +148,15 @@ def salvar_vaga_base(supabase: Optional[Client], vaga_data: dict, match_score: i
             return vaga_id
     except Exception as e:
         print(f"[AVISO] Erro ao salvar na tabela 'vagas': {e}")
+        try:
+            if vaga_data.get("link"):
+                res_exist = supabase.table("vagas").select("id").eq("link", vaga_data.get("link")).execute()
+                if res_exist.data and len(res_exist.data) > 0:
+                    exist_id = res_exist.data[0].get("id")
+                    print(f"[RECUPERADO] ID de vaga existente utilizado: {exist_id}")
+                    return exist_id
+        except Exception:
+            pass
     return None
 
 def salvar_vaga_processada(supabase: Optional[Client], vaga_data: dict, analise_ia: dict, status_candidatura: str = "alerta_manual") -> Optional[str]:
