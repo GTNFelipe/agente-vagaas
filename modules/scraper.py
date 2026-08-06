@@ -290,26 +290,58 @@ def eh_vaga_no_brasil(vaga: dict) -> bool:
 
 def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
     """
-    Verifica se a vaga possui modalidade Remota ou é Híbrida/Presencial localizada no Rio de Janeiro (RJ).
-    Descarta vagas presenciais ou híbridas em outros estados/cidades (SP, MG, PR, etc.).
+    Verifica se a vaga é estritamente:
+    1. 100% Remota (Home Office / Remote em qualquer lugar do Brasil).
+    2. Híbrida ou Presencial localizada ESTRITAMENTE no Rio de Janeiro (RJ).
+    
+    Descarta automaticamente:
+    - Qualquer vaga Presencial fora do Rio de Janeiro.
+    - Qualquer vaga Híbrida fora do Rio de Janeiro (ex: Híbrido SP, Híbrido Barueri, Híbrido BH, etc.).
     """
-    texto = f"{vaga.get('titulo', '')} {vaga.get('empresa', '')} {vaga.get('descricao', '')}".lower()
+    titulo = str(vaga.get("titulo", "")).lower()
+    empresa = str(vaga.get("empresa", "")).lower()
+    descricao = str(vaga.get("descricao", "")).lower()
+    texto = f"{titulo} {empresa} {descricao}"
 
-    # 1. Modalidade Remota / Home Office / Remote
-    if re.search(r'\b(remoto|remota|remote|home\s*office|teletrabalho|100%\s*remoto|work\s*from\s*home|anywhere)\b', texto):
-        return True
+    # Regiões fora do Estado do Rio de Janeiro
+    outras_regioes_regex = r'\b(s[aã]o\s*paulo|sp|barueri|alphaville|campinas|santo\s*andr[eé]|s[aã]o\s*bernardo|guarulhos|osasco|sorocaba|s[aã]o\s*jos[eé]|belo\s*horizonte|mg|curitiba|pr|porto\s*alegre|rs|florian[oó]polis|sc|blumenau|bras[íi]lia|df|salvador|ba|recife|pe|fortaleza|ce|goi[aâ]nia|go)\b'
 
-    # 2. Localização no Rio de Janeiro (RJ)
-    if re.search(r'\b(rio\s*de\s*janeiro|rj|barra\s*da\s*tijuca|centro\s*-\s*rj|botafogo|niter[oó]i|tijuca)\b', texto):
-        return True
+    # Marcas do Rio de Janeiro (RJ)
+    marcas_rj_regex = r'\b(rio\s*de\s*janeiro|rj|barra\s*da\s*tijuca|centro\s*-\s*rj|botafogo|niter[oó]i|tijuca|duque\s*de\s*caxias|niterói)\b'
 
-    # 3. Se mencionar explicitamente presencial/híbrido em outras regiões e NÃO tiver marcação de Remoto/RJ
-    outras_regioes = r'\b(s[aã]o\s*paulo|sp|belo\s*horizonte|mg|curitiba|pr|porto\s*alegre|rs|florian[oó]polis|sc|bras[íi]lia|df|campinas)\b'
-    if re.search(outras_regioes, texto):
+    # Modalidades
+    eh_hibrido = bool(re.search(r'\b(h[ií]brid[oa]|hybrid|hibrida)\b', texto))
+    eh_presencial = bool(re.search(r'\b(presencial|on-site|onsite|no\s+escrit[oó]rio)\b', texto))
+    eh_remoto_100 = bool(re.search(r'\b(100%\s*remoto|remoto\s*brasil|totalmente\s*remoto|remota|remote|home\s*office|teletrabalho|work\s*from\s*home|anywhere)\b', texto))
+    tem_marca_rj = bool(re.search(marcas_rj_regex, texto))
+    tem_outra_regiao = bool(re.search(outras_regioes_regex, texto))
+
+    # 1. Se for vaga Híbrida ou Presencial em outra região (fora do RJ) -> REJEITA IMEDIATAMENTE
+    if (eh_hibrido or eh_presencial) and tem_outra_regiao and not tem_marca_rj:
+        print(f"[FILTRO LOCALIDADE] Vaga Híbrida/Presencial descartada por ser fora do RJ: '{vaga.get('titulo')}' ({vaga.get('empresa')})")
         return False
 
-    # Por padrão, permite vagas que não sejam presenciais em outros estados
-    return True
+    # 2. Se for Presencial sem ser no RJ -> REJEITA
+    if eh_presencial and not tem_marca_rj:
+        print(f"[FILTRO LOCALIDADE] Vaga Presencial descartada por não ser no RJ: '{vaga.get('titulo')}' ({vaga.get('empresa')})")
+        return False
+
+    # 3. Se for Híbrida sem ser no RJ -> REJEITA
+    if eh_hibrido and not tem_marca_rj:
+        print(f"[FILTRO LOCALIDADE] Vaga Híbrida descartada por não ser no RJ: '{vaga.get('titulo')}' ({vaga.get('empresa')})")
+        return False
+
+    # 4. Se for Remota 100% -> APROVA
+    if eh_remoto_100 and not (eh_hibrido and tem_outra_regiao):
+        return True
+
+    # 5. Se for no Rio de Janeiro (RJ) -> APROVA
+    if tem_marca_rj:
+        return True
+
+    # Se não for 100% remota nem no RJ -> REJEITA por segurança
+    print(f"[FILTRO LOCALIDADE] Vaga descartada por não ser 100% Remota nem no RJ: '{vaga.get('titulo')}' ({vaga.get('empresa')})")
+    return False
 
 TERMOS_EXCLUSIVOS_GRUPO_REGEX = [
     # Exclusivas / Afirmativas para Mulheres e Programas Femininos
