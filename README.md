@@ -39,16 +39,24 @@ agente-vagaas/
 ## ✨ Principais Funcionalidades
 
 ### 🌐 Multi-Fonte de Coleta (Gratuita e Otimizada)
-1. **Google Jobs (SerpAPI Otimizada)**: Pesquisas direcionadas por tecnologia (`Java Junior`, `Analista de Sistemas`, `COBOL Mainframe`, `n8n`).
+1. **Google Jobs (SerpAPI Otimizada)**: Pesquisas direcionadas por tecnologia (`Java Junior`, `Analista de Sistemas`, `COBOL Mainframe`, `n8n`). Indexa automaticamente portais como **Remotar**, **Gupy**, **Catho**, **InfoJobs**, **LinkedIn**, **WhatJobs** e portais de empresas.
 2. **Programathor**: Scraper direto do portal de vagas tech no Brasil (**0 consumo de cota**).
-3. **Fóruns & Comunidades Dev no GitHub**: Coleta direta via API REST nos repositórios `backend-br/vagas` e `soujava/vagas` (**0 consumo de cota**).
-4. **Feeds RSS Tech**: Varredura contínua em feeds de vagas remotas (**0 consumo de cota**).
+3. **Fóruns & Comunidades Dev no GitHub**: Coleta em tempo real via API REST nos maiores repositórios de TI do Brasil (**0 consumo de cota**):
+   - `backend-br/vagas` (Backend / Microserviços / Java / Python / COBOL / Node)
+   - `frontendbr/vagas` (Frontend / Fullstack / Web)
+   - `react-brasil/vagas` (React / Fullstack / Node)
+   - `qa-brasil/vagas` (QA / Automação / Testes)
+   - `androiddevbr/vagas` (Mobile Android)
+   - `phpdevbr/vagas` (Backend PHP/Fullstack)
+   - `flutterbr/vagas` (Mobile Flutter)
+   - `vuejs-br/vagas` (Frontend/Fullstack Vue.js)
+4. **Feeds RSS Tech**: Varredura contínua em feeds de vagas remotas (RemoteOK, WeWorkRemotely, Remotive, Jobspress, WorkingNomads).
 
 ---
 
 ### 🕵️‍♂️ Deep Scraping & Auto-Apply Inteligente
 - **Deep Scraping de Contatos**: Investiga o HTML da página oficial da vaga para extrair e-mails diretos de recrutadores (`recrutamento@`, `rh@`, `vagas@`, `talent@`).
-- **Auto-Apply por E-mail**: Se o e-mail de RH for identificado, o robô dispara a candidatura **100% no automático**, anexando o PDF `CV_Felipe_Santana_[Empresa].pdf` e enviando uma cópia para o seu e-mail pessoal.
+- **Auto-Apply por E-mail**: Se o e-mail de RH for identificado, o robô dispara a candidatura **100% no automático**, anexando o PDF `CV_Felipe_Santana_[Empresa].pdf` e enviando uma cópia de confirmação para o e-mail do próprio candidato (`felipestartt@gmail.com`).
 - **Gestão de Limpeza**: Deleta os PDFs e arquivos temporários do disco local após a notificação, mantendo a cópia e o histórico salvos 100% no Supabase.
 
 ---
@@ -70,7 +78,7 @@ agente-vagaas/
 ---
 
 ### 🔒 Trava de Instância Única & UTF-8 no Windows
-- **Socket Process Lock (`garantir_instancia_unica`)**: O bot do Telegram utiliza um socket binding na porta `47891` que impede a execução de instâncias duplicadas simultâneas. Se um novo processo for aberto, ele encerra automaticamente para evitar mensagens repetidas no Telegram.
+- **Socket Process Lock (`garantir_instancia_unica`)**: O bot do Telegram utiliza um socket binding na porta `47891` em `modules/telegram_bot.py` que impede a execução de instâncias duplicadas simultâneas. Se um novo processo for aberto, ele encerra automaticamente para evitar mensagens repetidas no Telegram.
 - **Proteção UTF-8 (`sys.stdout.reconfigure`)**: Reconfigura o console no Windows para prevenir falhas de `UnicodeEncodeError` com emojis presentes nos títulos das vagas.
 
 ---
@@ -180,6 +188,16 @@ Interaja com o robô em tempo real enviando os comandos:
 
 ---
 
+## 🛡️ Conformidade & Auditoria GRC (Governance, Risk & Compliance)
+
+- **Sincronização de Fuso Horário**: Todos os relatórios utilizam o Horário de Brasília (BRT / UTC-3), garantindo que as contagens de vagas batam 100% entre a nuvem (GitHub Actions) e o seu Telegram.
+- **Proteção contra Injeção HTML**: Aplicação obrigatoria de `html.escape` nas entradas web para prevenir erros de parse na API do Telegram.
+- **Sanitização de URLs de Banco**: O sistema higieniza URLs e chaves removendo aspas e adicionando `https://` automaticamente.
+- **Formatação ATS-Friendly**: PDF gerado sem tabelas complexas ou elementos gráficos que prejudiquem a pontuação em robôs leitores de currículos.
+- **Zero Alucinação**: A IA gera adaptações limitando-se estritamente às informações factuais de `master_profile.json`.
+
+---
+
 ## 🚀 Como Executar Localmente
 
 1. **Clone o repositório:**
@@ -211,10 +229,3 @@ Interaja com o robô em tempo real enviando os comandos:
    ```bash
    python modules/telegram_bot.py
    ```
-
----
-
-## 🛡️ Garantias de Segurança & ATS
-- **Fuso Horário Sincronizado**: Todos os relatórios utilizam o Horário de Brasília (BRT / UTC-3), garantindo que as contagens de vagas batam 100% entre a nuvem e a sua máquina.
-- **Formatação ATS-Friendly**: PDF gerado sem tabelas complexas ou elementos gráficos que prejudiquem a pontuação em robôs leitores de currículos.
-- **Zero Alucinação**: A IA gera adaptações limitando-se estritamente às informações factuais de `master_profile.json`.
