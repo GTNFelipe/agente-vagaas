@@ -1,6 +1,6 @@
 # 🚀 Agente Autônomo de Vagas, Auto-Apply e Otimização de CV (AI-Driven ATS)
 
-Agente autônomo em **Python 3.10+** desenvolvido para buscar, filtrar, analisar e aplicar automaticamente para vagas de Tecnologia no Brasil (com foco em **COBOL, Mainframe, Java, Analista de Sistemas e Automação / n8n**).
+Agente autônomo em **Python 3.10+** desenvolvido para buscar, filtrar, analisar e aplicar automaticamente para vagas de Tecnologia no Brasil (com foco em **COBOL, Mainframe, Java Junior, Python Junior, Trainee TI, Analista de Sistemas e Automação / n8n / Low-code / No-code / Vibe Code**).
 
 O sistema utiliza a API da **Groq** (`llama-3.3-70b-versatile`) para calcular o score de aderência ATS (Match %), gerar currículos customizados em PDF via **ReportLab**, criar dossiês de preparação para entrevista e cartas de apresentação, enviando candidaturas automáticas por e-mail, registrando todo o histórico no **Supabase** (PostgreSQL) e fornecendo uma interface interativa completa via **Bot no Telegram**.
 
@@ -35,13 +35,12 @@ agente-vagaas/
 └── README.md                  # Documentação completa do projeto
 ```
 
-
 ---
 
 ## ✨ Principais Funcionalidades
 
 ### 🌐 Multi-Fonte de Coleta (Gratuita e Otimizada)
-1. **Google Jobs (SerpAPI Otimizada)**: Pesquisas direcionadas por tecnologia (`Java Junior`, `Analista de Sistemas`, `COBOL Mainframe`, `n8n`). Indexa automaticamente portais como **Remotar**, **Gupy**, **Catho**, **InfoJobs**, **LinkedIn**, **WhatJobs** e portais de empresas.
+1. **Google Jobs (SerpAPI Otimizada)**: Pesquisas direcionadas por tecnologia (`Java Junior`, `Python Junior`, `Analista de Sistemas`, `COBOL Mainframe`, `Trainee TI`, `n8n automacao`, `low code no code`). Indexa automaticamente portais como **Remotar**, **Gupy**, **Catho**, **InfoJobs**, **LinkedIn**, **WhatJobs** e portais de empresas.
 2. **Programathor**: Scraper direto do portal de vagas tech no Brasil (**0 consumo de cota**).
 3. **Fóruns & Comunidades Dev no GitHub**: Coleta em tempo real via API REST nos maiores repositórios de TI do Brasil (**0 consumo de cota**):
    - `backend-br/vagas` (Backend / Microserviços / Java / Python / COBOL / Node)
@@ -74,7 +73,7 @@ agente-vagaas/
 
 - ✅ **Aprovados**:
   - **Localização**: 100% Remoto (Home Office / Remote em qualquer lugar do Brasil) OU Híbrido/Presencial localizado **estritamente no Estado do Rio de Janeiro (RJ)**.
-  - **Cargos**: COBOL, Mainframe, Analista de Sistemas, Java (**Júnior / Trainee / Estágio**); Automação / n8n (**Júnior, Trainee ou Pleno**).
+  - **Cargos**: COBOL, Mainframe, Analista de Sistemas, Java, Python (**Júnior / Trainee / Estágio**); Automação / n8n / Low-code / No-code / Vibe Code (**Júnior, Trainee ou Pleno**).
   - **Candidatura**: 100% Gratuita.
 - ❌ **Descartados**:
   - **Localização Incompatível**: 100% de descarte de vagas presenciais ou híbridas fora do RJ (ex: São Paulo, Barueri, Alphaville, Belo Horizonte, Curitiba, Porto Alegre, Brasília, etc.).
@@ -86,9 +85,10 @@ agente-vagaas/
 
 ---
 
-### 🔒 Trava de Instância Única & UTF-8 no Windows
+### 🔒 Trava de Instância Única, UTF-8 & Proteção de Caminhos no Windows
 - **Socket Process Lock (`garantir_instancia_unica`)**: O bot do Telegram utiliza um socket binding na porta `47891` em `modules/telegram_bot.py` que impede a execução de instâncias duplicadas simultâneas. Se um novo processo for aberto, ele encerra automaticamente para evitar mensagens repetidas no Telegram.
 - **Proteção UTF-8 (`sys.stdout.reconfigure`)**: Reconfigura o console no Windows para prevenir falhas de `UnicodeEncodeError` com emojis presentes nos títulos das vagas.
+- **Higienização e Limite de Caminhos de Arquivo (Windows MAX_PATH)**: Trunca automaticamente nomes sanitizados de empresas e títulos de vagas para um limite seguro (máximo 30/35 caracteres), eliminando completamente erros `OSError: [Errno 22] Invalid argument` no Windows ao salvar PDFs, Dossiês e Cartas de Apresentação.
 
 ---
 
