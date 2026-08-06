@@ -153,9 +153,11 @@
     }
   ],
   "soft_skills": [
-    "Aprendizado Ágil e Autodidata",
-    "Curiosidade Investigativa",
-    "Adaptabilidade Técnica",
-    "Comunicação Objetiva e Resolução de Problemas Complexos"
+    "Atenção aos Detalhes e Orientação a Risco Zero em Sistemas Críticos",
+    "Análise Causa Raiz e Resolução de Problemas Complexos (Troubleshooting / ABENDs)",
+    "Governança de TI, Conformidade Regulatória e Controle ALM (Changeman / Compliance)",
+    "Análise de Requisitos e Leitura de Código Legado em Sistemas Bancários",
+    "Aprendizado Ágil, Adaptabilidade Técnica e Autodidatismo",
+    "Comunicação Técnica Objetiva e Atuação Ágil em Equipe (Scrum / Kanban / Jira)"
   ]
 }
