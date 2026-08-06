@@ -56,7 +56,27 @@ def gerar_relatorio_semanal():
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(remetente, senha_app)
             server.send_message(msg)
-        print("[SUCESSO] Relatorio semanal enviado com sucesso!")
+        print("[SUCESSO] Relatorio semanal enviado por e-mail com sucesso!")
+
+        # Notifica no Telegram
+        try:
+            from modules.telegram_bot import enviar_mensagem_telegram, TELEGRAM_CHAT_ID
+            msg_telegram = f"""📈 <b>[RELATÓRIO SEMANAL DE ANALYTICS]</b>
+
+📊 <b>Desempenho Geral do Agente de Vagas:</b>
+• <b>Total de Vagas Analisadas:</b> {total_vagas}
+• <b>Candidaturas Auto-Applies:</b> {candidatadas_auto}
+• <b>Alertas de Vagas Qualificadas:</b> {alertas_manuais}
+• <b>Vagas Descartadas:</b> {descartadas}
+• <b>Média de Match Score:</b> {media_score}%
+
+🟢 <i>Seu robô continuará a varredura automática diariamente!</i>"""
+            if TELEGRAM_CHAT_ID:
+                enviar_mensagem_telegram(TELEGRAM_CHAT_ID, msg_telegram)
+                print("[SUCESSO] Relatorio semanal enviado para o Telegram com sucesso!")
+        except Exception as e_tg:
+            print(f"[AVISO] Erro ao enviar relatorio semanal para Telegram: {e_tg}")
+
     except Exception as e:
         print(f"[ERRO] Erro ao gerar relatorio: {e}")
 
