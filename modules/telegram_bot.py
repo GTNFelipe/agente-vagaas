@@ -140,33 +140,51 @@ def comando_buscar(chat_id: str):
         BUSCA_EM_ANDAMENTO = False
 
 def gerar_relatorio_diario_telegram() -> str:
-    """Gera o resumo diário de desempenho (Daily Digest) consultando o Supabase e a SerpAPI."""
-    supabase = inicializar_supabase()
-    if not supabase:
-        return "⚠️ <b>Erro:</b> Supabase indisponível para relatório diário."
-
+    """Gera o resumo diário de desempenho (Daily Digest) consultando o Supabase e com fallback local."""
     from datetime import datetime
-    hoje_inicio = datetime.now().strftime("%Y-%m-%d 00:00:00")
+    hoje_str = datetime.now().strftime("%Y-%m-%d")
+    hoje_inicio = f"{hoje_str} 00:00:00"
 
-    try:
-        # Busca vagas processadas hoje
-        res_proc = supabase.table("vagas_processadas").select("id, status_candidatura, created_at").gte("created_at", hoje_inicio).execute()
-        proc_hoje = res_proc.data or []
-        total_proc_hoje = len(proc_hoje)
-        auto_applies_hoje = sum(1 for item in proc_hoje if item.get("status_candidatura") == "candidatado_auto")
+    total_proc_hoje = 0
+    qualificadas_hoje = 0
+    auto_applies_hoje = 0
+    fonte_dados = "Supabase 🟢"
 
-        # Busca vagas qualificadas hoje
-        res_vagas = supabase.table("vagas").select("id, created_at").gte("created_at", hoje_inicio).execute()
-        qualificadas_hoje = len(res_vagas.data or [])
+    supabase = inicializar_supabase()
+    if supabase:
+        try:
+            res_proc = supabase.table("vagas_processadas").select("id, status_candidatura, created_at").gte("created_at", hoje_inicio).execute()
+            proc_hoje = res_proc.data or []
+            total_proc_hoje = len(proc_hoje)
+            auto_applies_hoje = sum(1 for item in proc_hoje if item.get("status_candidatura") == "candidatado_auto")
 
-        # Consulta SerpAPI
-        info_serp = consultar_uso_serpapi()
-        usadas = info_serp.get("usadas", "N/A")
-        restantes = info_serp.get("restantes", "N/A")
-        limite = info_serp.get("limite", 250)
+            res_vagas = supabase.table("vagas").select("id, created_at").gte("created_at", hoje_inicio).execute()
+            qualificadas_hoje = len(res_vagas.data or [])
+        except Exception as e:
+            print(f"[AVISO RELATORIO] Erro ao consultar Supabase, usando fallback local: {e}")
+            supabase = None
 
-        mensagem = f"""📊 <b>[RESUMO DIÁRIO DO AGENTE DE VAGAS]</b>
-📅 <b>Data:</b> {datetime.now().strftime('%d/%m/%Y')}
+    if not supabase:
+        fonte_dados = "Base Local 🟠"
+        local_file = "vagas_processadas.json"
+        if os.path.exists(local_file):
+            try:
+                import json
+                with open(local_file, "r", encoding="utf-8") as f:
+                    local_data = json.load(f)
+                    total_proc_hoje = len(local_data)
+                    qualificadas_hoje = sum(1 for item in local_data if item.get("match_score", 0) >= 80)
+            except Exception:
+                pass
+
+    # Consulta SerpAPI
+    info_serp = consultar_uso_serpapi()
+    usadas = info_serp.get("usadas", "N/A")
+    restantes = info_serp.get("restantes", "N/A")
+    limite = info_serp.get("limite", 250)
+
+    mensagem = f"""📊 <b>[RESUMO DIÁRIO DO AGENTE DE VAGAS]</b>
+📅 <b>Data:</b> {datetime.now().strftime('%d/%m/%Y')} (<i>{fonte_dados}</i>)
 
 🔍 <b>Vagas Analisadas Hoje:</b> {total_proc_hoje}
 🎯 <b>Vagas Qualificadas Hoje (Match >= 80%):</b> {qualificadas_hoje}
@@ -176,10 +194,8 @@ def gerar_relatorio_diario_telegram() -> str:
 • <b>Pesquisas Usadas Este Mês:</b> {usadas} / {limite}
 • <b>Pesquisas Restantes:</b> {restantes}
 
-🟢 <i>O robô continuará as varreduras diárias normalmente amanhã a partir das 08:00!</i>"""
-        return mensagem
-    except Exception as e:
-        return f"⚠️ <b>Erro ao gerar relatório diário:</b> {e}"
+🟢 <i>O robô continuará as varreduras diárias normalmente!</i>"""
+    return mensagem
 
 def processar_mensagem(update: dict):
     """Processa mensagens e comandos recebidos do Telegram."""

@@ -17,9 +17,9 @@ def inicializar_supabase() -> Optional[Client]:
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     env_file = os.path.join(base_dir, ".env")
     if os.path.exists(env_file):
-        load_dotenv(dotenv_path=env_file)
+        load_dotenv(dotenv_path=env_file, override=True)
     else:
-        load_dotenv()
+        load_dotenv(override=True)
 
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_KEY")
