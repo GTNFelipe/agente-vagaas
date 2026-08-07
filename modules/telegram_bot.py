@@ -132,8 +132,7 @@ def comando_buscar(chat_id: str):
     BUSCA_EM_ANDAMENTO = True
     enviar_mensagem_telegram(chat_id, "⚡ <b>[BUSCA INICIADA]</b> Varrendo a web por novas vagas agora... Aguarde alguns instantes!")
     try:
-        main.main()
-        enviar_mensagem_telegram(chat_id, "✅ <b>[BUSCA CONCLUÍDA]</b> Varredura finalizada com sucesso! Se houverem novas vagas qualificadas, elas já foram enviadas acima.")
+        main.main(manual=True)
     except Exception as e:
         import traceback
         traceback.print_exc()

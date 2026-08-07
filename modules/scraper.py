@@ -616,6 +616,8 @@ def executar_varredura_completa():
     print(f"[SUCESSO] Total de vagas filtradas (Brasil, Gratuitas, Remoto/RJ): {len(vagas_filtradas)}")
     return vagas_filtradas
 
+coletar_vagas_todas_fontes = executar_varredura_completa
+
 def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
     """
     Verifica em tempo real se a vaga no link informado continua ativa e aceitando candidaturas gratuitas.

@@ -182,18 +182,55 @@ def enviar_notificacao_telegram(vaga_info: dict, analise_ia: dict, caminho_pdf: 
 
     return True
 
-def enviar_notificacao_vaga(vaga_info: dict, analise_ia: dict, caminho_pdf: str = None, caminho_dossie: str = None, caminho_carta: str = None, modo_candidatura: str = "manual"):
+def notificar_resumo_varredura(vagas_coletadas: int, vagas_novas_processadas: int, manual: bool = False):
     """
-    Notifica o candidato EXCLUSIVAMENTE via Telegram (removendo envio de e-mails para o candidato).
+    Envia uma mensagem de feedback no Telegram após a conclusão de qualquer varredura (automática 8x/dia ou manual).
+    Informa claramente o status, a quantidade de vagas e se nenhuma vaga nova foi encontrada.
     """
-    enviar_notificacao_telegram(
-        vaga_info=vaga_info,
-        analise_ia=analise_ia,
-        caminho_pdf=caminho_pdf,
-        caminho_dossie=caminho_dossie,
-        caminho_carta=caminho_carta,
-        modo_candidatura=modo_candidatura
-    )
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
 
-# Alias para compatibilidade
-send_job_notification = enviar_notificacao_vaga
+    if not token or not chat_id:
+        return False
+
+    from datetime import datetime, timezone, timedelta
+    fuso_brt = timezone(timedelta(hours=-3))
+    hora_atual = datetime.now(fuso_brt).strftime("%H:%M")
+
+    origem = "Manual (/buscar)" if manual else "Automática (Cron 8x/dia)"
+
+    if vagas_novas_processadas > 0:
+        texto = f"""🔍 <b>[VARREDURA CONCLUÍDA - {origem}]</b>
+⏰ <b>Horário:</b> {hora_atual} (BRT)
+
+✅ <b>Resultado:</b> {vagas_novas_processadas} nova(s) vaga(s) qualificada(s) e processada(s) nesta rodada!
+<i>(Todas as notificações com CV, Dossiê e Carta foram enviadas acima).</i>"""
+    else:
+        texto = f"""🔍 <b>[VARREDURA CONCLUÍDA - {origem}]</b>
+⏰ <b>Horário:</b> {hora_atual} (BRT)
+
+ℹ️ <b>Resultado:</b> Nenhuma vaga nova qualificada encontrada nesta rodada.
+(Vagas raspadas: {vagas_coletadas} | Todas já cadastradas anteriormente ou fora do perfil).
+
+🤖 <i>O agente continuará monitorando automaticamente na próxima execução agendada!</i>"""
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": texto,
+        "parse_mode": "HTML"
+    }
+
+    try:
+        resp = requests.post(url, json=payload, timeout=10)
+        if resp.status_code == 200:
+            print(f"[TELEGRAM] Resumo da varredura enviado com sucesso! ({vagas_novas_processadas} novas / {vagas_coletadas} coletadas)")
+    except Exception as e:
+        print(f"[ERRO TELEGRAM] Falha ao enviar resumo da varredura: {e}")
+
+    return True
+
+
+# Aliases para compatibilidade
+enviar_notificacao_vaga = enviar_notificacao_telegram
+send_job_notification = enviar_notificacao_telegram

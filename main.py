@@ -24,7 +24,7 @@ from modules.database import (
     salvar_curriculo_gerado,
     salvar_dossie_entrevista
 )
-from modules.notifier import realizar_candidatura_auto_email, enviar_notificacao_vaga
+from modules.notifier import realizar_candidatura_auto_email, enviar_notificacao_vaga, notificar_resumo_varredura
 
 load_dotenv()
 
@@ -41,7 +41,7 @@ def extrair_email_texto(texto: str) -> str:
     emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', texto)
     return emails[0] if emails else None
 
-def main():
+def main(manual: bool = False):
     print("[INICIO] Executando Agente de Vagas & Candidatura Autonoma (Fase 3)...")
     
     perfil_base = carregar_perfil_base()
@@ -52,10 +52,12 @@ def main():
     vagas_encontradas = coletar_vagas_todas_fontes(cargos_alvo)
 
     if not vagas_encontradas:
-        print("[INFO] Nenhuma vaga nova nesta rodada.")
+        print("[INFO] Nenhuma vaga encontrada nesta rodada.")
+        notificar_resumo_varredura(vagas_coletadas=0, vagas_novas_processadas=0, manual=manual)
         return
 
     # 2. Processamento
+    vagas_novas_processadas = 0
     for vaga in vagas_encontradas:
         link = vaga.get("link")
         titulo = vaga.get("titulo")
@@ -130,6 +132,7 @@ def main():
 
             # Registra na tabela 'vagas_processadas' do Supabase e cache local
             salvar_vaga_processada(supabase_client, vaga, analise, status_candidatura=status_envio)
+            vagas_novas_processadas += 1
 
             # Limpeza automática: Deleta os arquivos temporários após envio (mantendo salvos 100% no Supabase)
             for temp_file in [caminho_pdf, caminho_dossie, caminho_carta]:
@@ -144,6 +147,8 @@ def main():
 
         time.sleep(20)
 
+    # Notifica o Telegram com o resumo completo da varredura
+    notificar_resumo_varredura(vagas_coletadas=len(vagas_encontradas), vagas_novas_processadas=vagas_novas_processadas, manual=manual)
     print("\n[SUCESSO] Execucao completa finalizada com sucesso!")
 
 if __name__ == "__main__":
