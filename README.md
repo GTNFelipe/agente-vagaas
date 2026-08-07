@@ -41,8 +41,9 @@ agente-vagaas/
 
 ### 🌐 Multi-Fonte de Coleta (Gratuita e Otimizada)
 1. **Google Jobs (SerpAPI Otimizada)**: Pesquisas direcionadas por tecnologia (`Java Junior`, `Python Junior`, `Analista de Sistemas`, `COBOL Mainframe`, `Trainee TI`, `n8n automacao`, `low code no code`). Indexa automaticamente portais como **Remotar**, **Gupy**, **Catho**, **InfoJobs**, **LinkedIn**, **WhatJobs** e portais de empresas.
-2. **Programathor**: Scraper direto do portal de vagas tech no Brasil (**0 consumo de cota**).
-3. **Fóruns & Comunidades Dev no GitHub**: Coleta em tempo real via API REST nos maiores repositórios de TI do Brasil (**0 consumo de cota**):
+2. **LinkedIn (Scraper Público NATIVO / 0 Cota)**: Extração automatizada e gratuita via API pública Guest do LinkedIn (`jobs-guest/jobs/api`), capturando vagas e raspando a descrição técnica completa de cada publicação diretamente do LinkedIn sem necessidade de login.
+3. **Programathor**: Scraper direto do portal de vagas tech no Brasil (**0 consumo de cota**).
+4. **Fóruns & Comunidades Dev no GitHub**: Coleta em tempo real via API REST nos maiores repositórios de TI do Brasil (**0 consumo de cota**):
    - `backend-br/vagas` (Backend / Microserviços / Java / Python / COBOL / Node)
    - `frontendbr/vagas` (Frontend / Fullstack / Web)
    - `react-brasil/vagas` (React / Fullstack / Node)
@@ -51,7 +52,7 @@ agente-vagaas/
    - `phpdevbr/vagas` (Backend PHP/Fullstack)
    - `flutterbr/vagas` (Mobile Flutter)
    - `vuejs-br/vagas` (Frontend/Fullstack Vue.js)
-4. **Feeds RSS Tech**: Varredura contínua em feeds de vagas remotas (RemoteOK, WeWorkRemotely, Remotive, Jobspress, WorkingNomads).
+5. **Feeds RSS Tech**: Varredura contínua em feeds de vagas remotas (RemoteOK, WeWorkRemotely, Remotive, Jobspress, WorkingNomads).
 
 ---
 

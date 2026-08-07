@@ -484,10 +484,72 @@ def buscar_vagas_github_repos() -> list:
 
     return vagas_github
 
-def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
+def buscar_vagas_linkedin_publico(keywords: str, location: str = "Brasil") -> list:
     """
-    Executa a varredura em todas as fontes (Google Jobs via SerpAPI, Programathor, GitHub Repos e RSS Feeds).
-    Utiliza pesquisas direcionadas no Google Jobs por cargo alvo para garantir máximo rendimento de vagas.
+    Varre o portal público do LinkedIn (Guest API sem autenticação) para extrair vagas em tempo real.
+    Acessa os cards e obtém a descrição completa de cada vaga diretamente do LinkedIn.
+    """
+    vagas = []
+    try:
+        url_search = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={requests.utils.quote(keywords)}&location={requests.utils.quote(location)}&start=0"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
+        }
+        resp = requests.get(url_search, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            return vagas
+
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        cards = soup.find_all('li')
+
+        for card in cards[:10]:
+            title_elem = card.find('h3', class_='base-search-card__title')
+            comp_elem = card.find('h4', class_='base-search-card__subtitle')
+            loc_elem = card.find('span', class_='job-search-card__location')
+            link_elem = card.find('a', class_='base-card__full-link')
+
+            if title_elem and comp_elem and link_elem:
+                titulo = title_elem.get_text(strip=True)
+                empresa = comp_elem.get_text(strip=True)
+                localizacao = loc_elem.get_text(strip=True) if loc_elem else "Brasil"
+                link_vaga = link_elem.get('href', '').split('?')[0]
+
+                job_id = None
+                match = re.search(r'-(\d+)$', link_vaga)
+                if match:
+                    job_id = match.group(1)
+
+                descricao = f"Vaga do LinkedIn: {titulo} na empresa {empresa}. Localização: {localizacao}."
+                if job_id:
+                    try:
+                        url_detail = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
+                        r_det = requests.get(url_detail, headers=headers, timeout=8)
+                        if r_det.status_code == 200:
+                            soup_det = BeautifulSoup(r_det.text, 'html.parser')
+                            desc_elem = soup_det.find('div', class_='show-more-less-html__markup')
+                            if desc_elem:
+                                descricao = desc_elem.get_text(separator="\n", strip=True)
+                    except Exception:
+                        pass
+
+                vagas.append({
+                    "titulo": titulo,
+                    "empresa": empresa,
+                    "localizacao": localizacao,
+                    "link": link_vaga,
+                    "descricao": descricao,
+                    "fonte": "LinkedIn Public"
+                })
+    except Exception as e:
+        print(f"[AVISO] Falha ao coletar vagas públicas do LinkedIn para '{keywords}': {e}")
+
+    return vagas
+
+def executar_varredura_completa():
+    """
+    Orquestra a varredura multicanal em todas as fontes (Google Jobs via SerpAPI, LinkedIn Público, Programathor, Fóruns GitHub e RSS).
+    Utiliza pesquisas direcionadas por cargo alvo para garantir máximo rendimento de vagas.
     """
     todas_vagas = []
     
@@ -509,6 +571,23 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
         print(f"[GOOGLE JOBS] Query '{query}' retornou {len(vagas_g)} vagas.")
         todas_vagas.extend(vagas_g)
 
+    print("[BUSCA LINKEDIN] Varrendo LinkedIn (Portal Público / Sem consumo de cota)...")
+    vagas_linkedin = []
+    queries_linkedin = [
+        "Desenvolvedor Java Junior",
+        "Desenvolvedor Python Junior",
+        "Analista de Sistemas Junior",
+        "Desenvolvedor COBOL Mainframe",
+        "Analista COBOL Mainframe",
+        "Trainee TI",
+        "n8n automacao",
+        "low code no code"
+    ]
+    for q in queries_linkedin:
+        vl = buscar_vagas_linkedin_publico(keywords=q, location="Brasil")
+        vagas_linkedin.extend(vl)
+    print(f"[LINKEDIN] Coletadas {len(vagas_linkedin)} vagas do LinkedIn.")
+
     print("[BUSCA PROGRAMATHOR] Varrendo portal Programathor (Gratuito / Sem consumo de cota)...")
     vagas_programathor = buscar_vagas_programathor()
 
@@ -518,7 +597,7 @@ def coletar_vagas_todas_fontes(cargos_alvo: list) -> list:
     print("[BUSCA FEEDS] Varrendo RSS Feeds de vagas (Gratuito / Sem consumo de cota)...")
     vagas_rss = buscar_vagas_rss_feed()
 
-    todas_coletadas = todas_vagas + vagas_programathor + vagas_github_forums + vagas_rss
+    todas_coletadas = todas_vagas + vagas_linkedin + vagas_programathor + vagas_github_forums + vagas_rss
 
     vagas_filtradas = []
     
