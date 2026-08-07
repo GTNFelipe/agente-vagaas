@@ -546,7 +546,7 @@ def buscar_vagas_linkedin_publico(keywords: str, location: str = "Brasil") -> li
 
     return vagas
 
-def executar_varredura_completa():
+def executar_varredura_completa(cargos_alvo: list = None):
     """
     Orquestra a varredura multicanal em todas as fontes (Google Jobs via SerpAPI, LinkedIn Público, Programathor, Fóruns GitHub e RSS).
     Utiliza pesquisas direcionadas por cargo alvo para garantir máximo rendimento de vagas.
