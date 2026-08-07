@@ -93,6 +93,16 @@ agente-vagaas/
 
 ---
 
+### 📲 Notificação Universal & Transparência em 100% das Execuções
+- **Feedback em 100% das Execuções**: Seja em execuções automáticas na nuvem (GitHub Actions 8x ao dia) ou manuais via Telegram (`/buscar`), o robô **sempre envia uma notificação de retorno no Telegram**.
+- **Relatório de Rodada Sem Vagas Novas**: Caso nenhuma vaga nova qualificada seja encontrada (vagas coletadas já processadas anteriormente ou descartadas pelos filtros), o bot avisa expressamente:
+  `🔍 [VARREDURA CONCLUÍDA - Automática (Cron 8x/dia) / Manual]`
+  `ℹ️ Resultado: Nenhuma vaga nova qualificada encontrada nesta rodada.`
+  `🤖 O agente continuará monitorando automaticamente na próxima execução agendada!`
+- **Anexo Instantâneo de Documentos**: Quando vagas qualificadas inéditas são encontradas, o Telegram recebe automaticamente a notificação individual acompanhada de **3 arquivos em anexo**: PDF do CV customizado, Dossiê de Entrevista (.md) e Carta de Apresentação (.txt).
+
+---
+
 ## 🗄️ Configuração do Banco de Dados no Supabase
 
 Execute o arquivo **`schema_supabase.sql`** no **SQL Editor** do seu painel Supabase (https://supabase.com/dashboard):
