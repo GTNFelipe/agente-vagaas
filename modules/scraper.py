@@ -1,6 +1,8 @@
 import os
 import sys
 import re
+import json
+from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
@@ -14,6 +16,95 @@ try:
     from serpapi import GoogleSearch
 except ImportError:
     GoogleSearch = None
+
+SERPAPI_TRACKER_FILE = "serpapi_daily_tracker.json"
+
+def obter_orcamento_diario_serpapi() -> dict:
+    """
+    Consulta o SerpAPI para obter o saldo de pesquisas restantes e a data de renovação.
+    Calcula dinamicamente a cota diária permitida (restantes // dias_restantes).
+    """
+    api_key = os.getenv("SERPAPI_KEY")
+    if not api_key:
+        return {"limite_diario": 0, "restantes": 0, "dias_restantes": 0}
+    
+    try:
+        url = f"https://serpapi.com/account?api_key={api_key}"
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            restantes = data.get("total_searches_left", 0)
+            renovacao_str = data.get("plan_renewal_date", "")
+            
+            dias_restantes = 30
+            if renovacao_str:
+                try:
+                    data_renov = datetime.strptime(renovacao_str, "%Y-%m-%d").date()
+                    hoje = datetime.now().date()
+                    dias_restantes = max(1, (data_renov - hoje).days)
+                except Exception:
+                    pass
+            
+            limite_diario = max(1, restantes // dias_restantes) if restantes > 0 else 0
+            return {
+                "limite_diario": limite_diario,
+                "restantes": restantes,
+                "dias_restantes": dias_restantes,
+                "renovacao": renovacao_str
+            }
+    except Exception as e:
+        print(f"[AVISO SERPAPI BUDGET] Erro ao consultar cota SerpAPI: {e}")
+    
+    return {"limite_diario": 1, "restantes": 39, "dias_restantes": 25}
+
+def pode_executar_busca_serpapi_hoje() -> tuple:
+    """
+    Verifica se a cota de disparos diários do SerpAPI já foi atingida hoje.
+    Retorna (permitido: bool, buscas_hoje: int, limite_diario: int).
+    """
+    info = obter_orcamento_diario_serpapi()
+    limite_diario = info.get("limite_diario", 1)
+    
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    tracker = {}
+    
+    if os.path.exists(SERPAPI_TRACKER_FILE):
+        try:
+            with open(SERPAPI_TRACKER_FILE, "r", encoding="utf-8") as f:
+                tracker = json.load(f)
+        except Exception:
+            tracker = {}
+            
+    if tracker.get("date") != today_str:
+        tracker = {"date": today_str, "searches_today": 0}
+        
+    searches_today = tracker.get("searches_today", 0)
+    permitido = (searches_today < limite_diario)
+    return permitido, searches_today, limite_diario
+
+def registrar_busca_serpapi_executada():
+    """
+    Incrementa e persiste o contador de buscas SerpAPI executadas no dia atual.
+    """
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    tracker = {}
+    if os.path.exists(SERPAPI_TRACKER_FILE):
+        try:
+            with open(SERPAPI_TRACKER_FILE, "r", encoding="utf-8") as f:
+                tracker = json.load(f)
+        except Exception:
+            tracker = {}
+            
+    if tracker.get("date") != today_str:
+        tracker = {"date": today_str, "searches_today": 0}
+        
+    tracker["searches_today"] = tracker.get("searches_today", 0) + 1
+    
+    try:
+        with open(SERPAPI_TRACKER_FILE, "w", encoding="utf-8") as f:
+            json.dump(tracker, f, indent=2)
+    except Exception as e:
+        print(f"[AVISO TRACKER SERPAPI] Falha ao registrar busca: {e}")
 
 def buscar_vagas_google_jobs(query: str, localizacao: str = "Brazil") -> list:
     """
@@ -565,11 +656,19 @@ def executar_varredura_completa(cargos_alvo: list = None):
         "low code no code Brasil"
     ]
 
-    print("[BUSCA GOOGLE JOBS] Disparando pesquisas direcionadas no Google Jobs via SerpAPI...")
-    for query in queries_google:
-        vagas_g = buscar_vagas_google_jobs(query=query)
-        print(f"[GOOGLE JOBS] Query '{query}' retornou {len(vagas_g)} vagas.")
+    permitido_serp, buscas_hoje, limite_diario_serp = pode_executar_busca_serpapi_hoje()
+    
+    if permitido_serp:
+        day_of_year = datetime.now().timetuple().tm_yday
+        query_do_dia = queries_google[day_of_year % len(queries_google)]
+        print(f"[BUSCA GOOGLE JOBS] Disparando pesquisa no Google Jobs via SerpAPI (Uso Hoje: {buscas_hoje+1}/{limite_diario_serp})...")
+        print(f"[SERPAPI ROTATIVO] Termo selecionado para hoje: '{query_do_dia}'")
+        vagas_g = buscar_vagas_google_jobs(query=query_do_dia)
+        registrar_busca_serpapi_executada()
+        print(f"[GOOGLE JOBS] Query '{query_do_dia}' retornou {len(vagas_g)} vagas.")
         todas_vagas.extend(vagas_g)
+    else:
+        print(f"[BUSCA GOOGLE JOBS] Cota diária do SerpAPI atingida ({buscas_hoje}/{limite_diario_serp} disparos hoje). Pulando Google Jobs nesta rodada para preservar cota até a renovação.")
 
     print("[BUSCA LINKEDIN] Varrendo LinkedIn (Portal Público / Sem consumo de cota)...")
     vagas_linkedin = []

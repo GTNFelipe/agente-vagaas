@@ -40,7 +40,7 @@ agente-vagaas/
 ## ✨ Principais Funcionalidades
 
 ### 🌐 Multi-Fonte de Coleta (Gratuita e Otimizada)
-1. **Google Jobs (SerpAPI Otimizada)**: Pesquisas direcionadas por tecnologia (`Java Junior`, `Python Junior`, `Analista de Sistemas`, `COBOL Mainframe`, `Trainee TI`, `n8n automacao`, `low code no code`). Indexa automaticamente portais como **Remotar**, **Gupy**, **Catho**, **InfoJobs**, **LinkedIn**, **WhatJobs** e portais de empresas.
+1. **Google Jobs (SerpAPI Otimizada & Controle Dinâmico de Cota)**: Pesquisas direcionadas por tecnologia (`Java Junior`, `Python Junior`, `Analista de Sistemas`, `COBOL Mainframe`, `Trainee TI`, `n8n automacao`, `low code no code`). Possui **Gerenciador Dinâmico de Cota Diária** (`serpapi_daily_tracker.json`), que calcula dinamicamente o ritmo ideal (atualmente ajustado para **1 disparo por dia com rotação de termos de busca**) para garantir sustentabilidade total até a renovação do plano em **03/09/2026** (39 disparos restantes em 25 dias, retendo 14 disparos de margem de segurança para buscas manuais). Indexa automaticamente portais como **Remotar**, **Gupy**, **Catho**, **InfoJobs**, **LinkedIn**, **WhatJobs** e portais de empresas.
 2. **LinkedIn (Scraper Público NATIVO / 0 Cota)**: Extração automatizada e gratuita via API pública Guest do LinkedIn (`jobs-guest/jobs/api`), capturando vagas e raspando a descrição técnica completa de cada publicação diretamente do LinkedIn sem necessidade de login.
 3. **Programathor**: Scraper direto do portal de vagas tech no Brasil (**0 consumo de cota**).
 4. **Fóruns & Comunidades Dev no GitHub**: Coleta em tempo real via API REST nos maiores repositórios de TI do Brasil (**0 consumo de cota**):
@@ -53,6 +53,8 @@ agente-vagaas/
    - `flutterbr/vagas` (Mobile Flutter)
    - `vuejs-br/vagas` (Frontend/Fullstack Vue.js)
 5. **Feeds RSS Tech**: Varredura contínua em feeds de vagas remotas (RemoteOK, WeWorkRemotely, Remotive, Jobspress, WorkingNomads).
+
+> 💳 **Gestão Automática de Cota SerpAPI**: O robô calcula dinamicamente a cota diária permitida baseando-se no saldo ao vivo retornado pela API SerpAPI (`total_searches_left / dias_ate_renovacao`). Caso o limite diário seja atingido (ex: 1 disparo/dia), as varreduras automáticas adicionais do dia pulam o Google Jobs e continuam executando 100% normalmente em todas as outras fontes gratuitas (LinkedIn, Programathor, GitHub e RSS).
 
 ---
 
