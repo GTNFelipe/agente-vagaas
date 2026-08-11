@@ -338,14 +338,18 @@ def processar_mensagem(update: dict):
     if not text:
         return
 
-    # Valida se a mensagem veio do seu chat autorizado
-    if chat_id != str(TELEGRAM_CHAT_ID):
-        print(f"[BOT SECURITY] Mensagem ignorada de chat não autorizado: {chat_id}")
+    print(f"[BOT TELEGRAM] Mensagem recebida de {chat_id}: '{text[:30]}...'")
+
+    # Valida se a mensagem veio do seu chat autorizado (se TELEGRAM_CHAT_ID estiver configurado)
+    authorized_chat_id = str(os.getenv("TELEGRAM_CHAT_ID") or TELEGRAM_CHAT_ID or "").strip()
+    if authorized_chat_id and chat_id != authorized_chat_id:
+        print(f"[BOT SECURITY] Mensagem ignorada de chat não autorizado: {chat_id} (esperado: {authorized_chat_id})")
         return
 
     if text.startswith("/"):
         partes = text.split(maxsplit=1)
-        cmd = partes[0].lower()
+        # Extrai a primeira palavra do comando e remove o sufixo @nome_do_bot (ex: /start@vaga_felipebot -> /start)
+        cmd = partes[0].lower().split("@")[0]
 
         if cmd in ["/start", "/ajuda", "/help"]:
             ajuda_texto = """🤖 <b>[MENU DO AGENTE DE VAGAS]</b>
