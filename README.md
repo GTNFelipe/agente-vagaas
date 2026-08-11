@@ -65,9 +65,10 @@ agente-vagaas/
 
 ---
 
-### 🕵️‍♂️ Deep Scraping & Auto-Apply Inteligente
+### 🕵️‍♂️ Deep Scraping, Análise Direta no Telegram & Auto-Apply Inteligente
 - **Deep Scraping de Contatos**: Investiga o HTML da página oficial da vaga para extrair e-mails diretos de recrutadores (`recrutamento@`, `rh@`, `vagas@`, `talent@`).
-- **Auto-Apply por E-mail**: Se o e-mail de RH for identificado, o robô dispara a candidatura **100% no automático**, anexando o PDF `CV_[Nome]_[Empresa].pdf` e enviando uma cópia de confirmação para o e-mail do próprio candidato.
+- **Análise Direta de Vagas via Telegram**: Envie a descrição de qualquer vaga diretamente no chat do Telegram (ou com `/vaga <descrição>`). O bot calcula o match de aderência e gera o **Currículo em PDF**, **Dossiê em Markdown** e **Carta de Apresentação em Texto**, retornando todos anexados no chat.
+- **Auto-Apply por E-mail**: Se o e-mail de RH for identificado na varredura web ou na descrição enviada pelo Telegram, o robô dispara a candidatura **100% no automático**, anexando o PDF `CV_[Nome]_[Empresa].pdf` e enviando uma cópia de confirmação para o e-mail do próprio candidato.
 - **Gestão de Limpeza**: Deleta os PDFs e arquivos temporários do disco local após a notificação, mantendo a cópia e o histórico salvos 100% no Supabase.
 
 ---
@@ -101,7 +102,7 @@ agente-vagaas/
   `🔍 [VARREDURA CONCLUÍDA - Automática (Cron 8x/dia) / Manual]`
   `ℹ️ Resultado: Nenhuma vaga nova qualificada encontrada nesta rodada.`
   `🤖 O agente continuará monitorando automaticamente na próxima execução agendada!`
-- **Anexo Instantâneo de Documentos**: Quando vagas qualificadas inéditas são encontradas, o Telegram recebe automaticamente a notificação individual acompanhada de **3 arquivos em anexo**: PDF do CV customizado, Dossiê de Entrevista (.md) e Carta de Apresentação (.txt).
+- **Anexo Instantâneo de Documentos**: Quando vagas qualificadas inéditas são encontradas ou enviadas pelo chat, o Telegram recebe automaticamente a notificação individual acompanhada de **3 arquivos em anexo**: PDF do CV customizado, Dossiê de Entrevista (.md) e Carta de Apresentação (.txt).
 
 ---
 
@@ -282,6 +283,8 @@ TELEGRAM_CHAT_ID=seu_chat_id_telegram
 
 Interaja com o robô em tempo real enviando os comandos:
 
+- **💬 Texto Livre de Vaga**: Cole qualquer descrição completa de vaga no chat para receber o CV (PDF), Dossiê (MD) e Carta (TXT), com disparo de candidatura por e-mail se houver RH no texto.
+- **`/vaga <descrição>`**: Comando explícito para analisar uma vaga via texto.
 - **`/relatorio`**: Exibe o relatório sob demanda (`⚡ [RELATÓRIO SOB DEMANDA - /relatorio]`).
 - **`/status`**: Exibe a cota ao vivo da SerpAPI e estatísticas de vagas do Supabase.
 - **`/buscar`**: Dispara uma varredura completa por novas vagas na web.

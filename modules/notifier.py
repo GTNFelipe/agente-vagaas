@@ -140,19 +140,19 @@ def enviar_notificacao_telegram(vaga_info: dict, analise_ia: dict, caminho_pdf: 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     doc_url = f"https://api.telegram.org/bot{token}/sendDocument"
 
-    reply_markup = {
-        "inline_keyboard": [
-            [{"text": "🔗 Abrir Anúncio da Vaga", "url": link_vaga}]
-        ]
-    }
-
     payload = {
         "chat_id": chat_id,
         "text": mensagem,
         "parse_mode": "HTML",
-        "reply_markup": reply_markup,
         "disable_web_page_preview": False
     }
+
+    if link_vaga and (link_vaga.startswith("http://") or link_vaga.startswith("https://")):
+        payload["reply_markup"] = {
+            "inline_keyboard": [
+                [{"text": "🔗 Abrir Anúncio da Vaga", "url": link_vaga}]
+            ]
+        }
 
     try:
         response = requests.post(url, json=payload, timeout=10)

@@ -2,6 +2,8 @@ import os
 import sys
 import time
 import socket
+import threading
+import re
 import requests
 from dotenv import load_dotenv
 
@@ -35,7 +37,18 @@ if os.path.exists(ENV_FILE):
 else:
     load_dotenv()
 
-from modules.database import inicializar_supabase
+from modules.database import (
+    inicializar_supabase,
+    salvar_vaga_base,
+    salvar_curriculo_gerado,
+    salvar_dossie_entrevista,
+    salvar_vaga_processada
+)
+from modules.tailor import adaptar_curriculo
+from modules.pdf_generator import gerar_pdf_curriculo
+from modules.dossier import gerar_dossie_vaga
+from modules.cover_letter import gerar_arquivo_carta_apresentacao
+from modules.notifier import enviar_notificacao_vaga, realizar_candidatura_auto_email
 import main
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -212,37 +225,165 @@ def gerar_relatorio_diario_telegram(automatico: bool = False) -> str:
 {rodape}"""
     return mensagem
 
+def processar_vaga_direta(chat_id: str, texto_vaga: str):
+    """
+    Processa a descrição de uma vaga enviada diretamente pelo usuário no Telegram.
+    Gera e envia o Currículo Otimizado (PDF), Dossiê de Entrevista (MD) e Carta de Apresentação (TXT).
+    Se houver e-mail de recrutador no texto, executa candidatura automática por e-mail.
+    """
+    enviar_mensagem_telegram(
+        chat_id,
+        "⏳ <b>[PROCESSANDO VAGA]</b> Recebi a descrição da vaga!\n"
+        "Analisando perfil, calculando match e gerando Currículo, Dossiê e Carta de Apresentação... Aguarde alguns instantes!"
+    )
+    try:
+        perfil_base = main.carregar_perfil_base()
+
+        # Tenta extrair título e empresa do texto se houver padrões comuns
+        titulo = "Vaga Solicitada via Telegram"
+        empresa = "Empresa via Telegram"
+
+        lines = [l.strip() for l in texto_vaga.split("\n") if l.strip()]
+        for line in lines[:5]:
+            l_lower = line.lower()
+            if l_lower.startswith("vaga:") or l_lower.startswith("cargo:") or l_lower.startswith("título:") or l_lower.startswith("titulo:"):
+                titulo = line.split(":", 1)[1].strip()
+            elif l_lower.startswith("empresa:"):
+                empresa = line.split(":", 1)[1].strip()
+
+        if titulo == "Vaga Solicitada via Telegram" and lines:
+            primeira_linha = lines[0]
+            if len(primeira_linha) <= 60 and not primeira_linha.lower().startswith("descriç"):
+                titulo = primeira_linha
+
+        vaga_info = {
+            "titulo": titulo,
+            "empresa": empresa,
+            "link": "",
+            "descricao": texto_vaga
+        }
+
+        analise = adaptar_curriculo(texto_vaga, perfil_base)
+        match_score = analise.get("match_score", 0)
+
+        clean_empresa = (re.sub(r'[^\w\-_]', '_', str(empresa)).strip("_")[:30]) or "Empresa"
+        nome_candidato_clean = (re.sub(r'[^\w\-_]', '_', str(perfil_base.get("nome", "Candidato"))).strip("_")[:30]) or "Candidato"
+
+        # 1. Gerar PDF do Currículo Otimizado
+        pasta_cvs = "curriculos_gerados"
+        os.makedirs(pasta_cvs, exist_ok=True)
+        nome_arquivo_pdf = f"CV_{nome_candidato_clean}_{clean_empresa}.pdf"
+        caminho_pdf = os.path.join(pasta_cvs, nome_arquivo_pdf)
+        gerar_pdf_curriculo(perfil_base, analise, output_filename=caminho_pdf)
+
+        # 2. Gerar Dossiê de Entrevista
+        caminho_dossie = gerar_dossie_vaga(vaga_info, analise)
+
+        # 3. Gerar Carta de Apresentação
+        caminho_carta = gerar_arquivo_carta_apresentacao(vaga_info, analise, perfil_base)
+
+        # Extrai e-mail de candidatura da descrição da vaga para Auto-Apply
+        email_recrutador = main.extrair_email_texto(texto_vaga)
+        status_envio = "solicitado_telegram"
+        modo_candidatura = "manual"
+
+        if email_recrutador:
+            vaga_info["email_candidatura"] = email_recrutador
+            enviar_mensagem_telegram(chat_id, f"📧 <b>[AUTO-APPLY ENCONTRADO]</b> E-mail de recrutador identificado: <code>{email_recrutador}</code>.\nEnviando candidatura automática por e-mail com seu Currículo PDF anexo...")
+            sucesso_apply = realizar_candidatura_auto_email(vaga_info, analise, caminho_pdf, perfil_base)
+            if sucesso_apply:
+                status_envio = "candidatado_auto"
+                modo_candidatura = "auto"
+                enviar_mensagem_telegram(chat_id, f"✅ <b>[AUTO-APPLY CONCLUÍDO]</b> Candidatura e currículo PDF enviados com sucesso para <code>{email_recrutador}</code>!")
+            else:
+                enviar_mensagem_telegram(chat_id, f"⚠️ <b>[AUTO-APPLY FALHOU]</b> Não foi possível enviar e-mail automático para <code>{email_recrutador}</code>. Verifique as credenciais do Gmail no .env.")
+
+        # 4. Registrar no Supabase se disponível
+        supabase_client = inicializar_supabase()
+        vaga_id = salvar_vaga_base(supabase_client, vaga_info, match_score, status="SOLICITADA_TELEGRAM")
+        if vaga_id:
+            salvar_curriculo_gerado(supabase_client, vaga_id, caminho_pdf, analise)
+            salvar_dossie_entrevista(supabase_client, vaga_id, analise)
+        salvar_vaga_processada(supabase_client, vaga_info, analise, status_candidatura=status_envio)
+
+        # 5. Enviar notificação com texto rico + anexos (PDF, Dossiê, Carta) no Telegram
+        enviar_notificacao_vaga(
+            vaga_info=vaga_info,
+            analise_ia=analise,
+            caminho_pdf=caminho_pdf,
+            caminho_dossie=caminho_dossie,
+            caminho_carta=caminho_carta,
+            modo_candidatura=modo_candidatura
+        )
+
+        # 6. Limpeza dos arquivos temporários locais
+        for temp_file in [caminho_pdf, caminho_dossie, caminho_carta]:
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except Exception:
+                    pass
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        enviar_mensagem_telegram(chat_id, f"❌ <b>[ERRO AO PROCESSAR VAGA]</b> Falha ao analisar vaga: {e}")
+
 def processar_mensagem(update: dict):
     """Processa mensagens e comandos recebidos do Telegram."""
     message = update.get("message", {})
     text = message.get("text", "").strip()
     chat_id = str(message.get("chat", {}).get("id", ""))
 
+    if not text:
+        return
+
     # Valida se a mensagem veio do seu chat autorizado
     if chat_id != str(TELEGRAM_CHAT_ID):
         print(f"[BOT SECURITY] Mensagem ignorada de chat não autorizado: {chat_id}")
         return
 
-    if text in ["/start", "/ajuda", "/help"]:
-        ajuda_texto = """🤖 <b>[MENU DO AGENTE DE VAGAS]</b>
+    if text.startswith("/"):
+        partes = text.split(maxsplit=1)
+        cmd = partes[0].lower()
+
+        if cmd in ["/start", "/ajuda", "/help"]:
+            ajuda_texto = """🤖 <b>[MENU DO AGENTE DE VAGAS]</b>
 
 Comandos disponíveis:
 📊 /status - Exibe estatísticas de vagas e cota ao vivo.
 📅 /relatorio - Exibe o resumo de desempenho do dia de hoje (Daily Digest).
-⚡ /buscar - Dispara uma busca de vagas imediatamente.
-❓ /ajuda - Exibe este menu de ajuda."""
-        enviar_mensagem_telegram(chat_id, ajuda_texto)
+⚡ /buscar - Dispara uma busca de vagas na web imediatamente.
+💼 /vaga &lt;descrição&gt; - Analisa uma vaga enviada via texto e gera CV, Dossiê e Carta.
+❓ /ajuda - Exibe este menu de ajuda.
 
-    elif text == "/status":
-        status_msg = comando_status()
-        enviar_mensagem_telegram(chat_id, status_msg)
+💡 <b>Dica:</b> Você também pode colar a descrição completa de uma vaga diretamente nesta conversa para receber o Currículo, Dossiê e Carta instantaneamente!"""
+            enviar_mensagem_telegram(chat_id, ajuda_texto)
 
-    elif text == "/relatorio":
-        rel_msg = gerar_relatorio_diario_telegram()
-        enviar_mensagem_telegram(chat_id, rel_msg)
+        elif cmd == "/status":
+            status_msg = comando_status()
+            enviar_mensagem_telegram(chat_id, status_msg)
 
-    elif text == "/buscar":
-        comando_buscar(chat_id)
+        elif cmd == "/relatorio":
+            rel_msg = gerar_relatorio_diario_telegram()
+            enviar_mensagem_telegram(chat_id, rel_msg)
+
+        elif cmd == "/buscar":
+            comando_buscar(chat_id)
+
+        elif cmd in ["/vaga", "/analisar"]:
+            if len(partes) > 1 and partes[1].strip():
+                texto_vaga = partes[1].strip()
+                threading.Thread(target=processar_vaga_direta, args=(chat_id, texto_vaga), daemon=True).start()
+            else:
+                enviar_mensagem_telegram(chat_id, "⚠️ Por favor, envie a descrição da vaga após o comando.\nExemplo:\n<code>/vaga Desenvolvedor Python...</code>")
+        else:
+            enviar_mensagem_telegram(chat_id, "⚠️ Comando não reconhecido. Use /ajuda para ver os comandos ou envie a descrição da vaga diretamente.")
+    else:
+        if len(text) >= 15:
+            threading.Thread(target=processar_vaga_direta, args=(chat_id, text), daemon=True).start()
+        else:
+            enviar_mensagem_telegram(chat_id, "ℹ️ Para analisar uma vaga, envie a descrição completa da vaga nesta conversa ou use o comando <code>/vaga &lt;descrição&gt;</code>.")
 
 def escutar_comandos():
     """Inicia o loop de escuta de comandos do Telegram via Long Polling."""
