@@ -54,6 +54,7 @@ import main
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+BOT_START_TIME = time.time()
 
 def enviar_mensagem_telegram(chat_id: str, texto: str):
     """Envia mensagem formatada em HTML para o chat do Telegram."""
@@ -355,6 +356,7 @@ def processar_mensagem(update: dict):
             ajuda_texto = """🤖 <b>[MENU DO AGENTE DE VAGAS]</b>
 
 Comandos disponíveis:
+🏓 /ping - Verifica se o bot está online e operante.
 📊 /status - Exibe estatísticas de vagas e cota ao vivo.
 📅 /relatorio - Exibe o resumo de desempenho do dia de hoje (Daily Digest).
 ⚡ /buscar - Dispara uma busca de vagas na web imediatamente.
@@ -363,6 +365,23 @@ Comandos disponíveis:
 
 💡 <b>Dica:</b> Você também pode colar a descrição completa de uma vaga diretamente nesta conversa para receber o Currículo, Dossiê e Carta instantaneamente!"""
             enviar_mensagem_telegram(chat_id, ajuda_texto)
+
+        elif cmd in ["/ping", "ping"]:
+            from datetime import datetime, timezone, timedelta
+            fuso_brt = timezone(timedelta(hours=-3))
+            agora_str = datetime.now(fuso_brt).strftime("%d/%m/%Y às %H:%M:%S")
+            uptime_seconds = int(time.time() - BOT_START_TIME)
+            horas, resto = divmod(uptime_seconds, 3600)
+            minutos, segundos = divmod(resto, 60)
+            uptime_str = f"{horas}h {minutos}m {segundos}s"
+
+            ping_msg = f"""🏓 <b>PONG!</b> O Agente de Vagas está 100% online e operante!
+
+📅 <b>Horário Local:</b> {agora_str}
+⏱️ <b>Uptime do Bot:</b> {uptime_str}
+🟢 <b>Status da Conexão:</b> Ativa (Long Polling)
+⚡ <b>Pronto para receber vagas e comandos!</b>"""
+            enviar_mensagem_telegram(chat_id, ping_msg)
 
         elif cmd == "/status":
             status_msg = comando_status()
@@ -389,6 +408,23 @@ Comandos disponíveis:
         else:
             enviar_mensagem_telegram(chat_id, "ℹ️ Para analisar uma vaga, envie a descrição completa da vaga nesta conversa ou use o comando <code>/vaga &lt;descrição&gt;</code>.")
 
+def iniciar_heartbeat():
+    """Thread em segundo plano que faz pings periódicos na API do Telegram para garantir conexão ativa."""
+    def heartbeat_loop():
+        while True:
+            time.sleep(300)  # A cada 5 minutos
+            try:
+                if TELEGRAM_TOKEN:
+                    res = requests.get(f"{API_URL}/getMe", timeout=10)
+                    if res.status_code == 200:
+                        bot_name = res.json().get("result", {}).get("username", "bot")
+                        print(f"[HEARTBEAT TELEGRAM] Ping OK - Bot @{bot_name} ativo ({time.strftime('%H:%M:%S')})")
+            except Exception as e:
+                print(f"[HEARTBEAT TELEGRAM AVISO] Falha no ping de conexão: {e}")
+
+    t = threading.Thread(target=heartbeat_loop, daemon=True)
+    t.start()
+
 def escutar_comandos():
     """Inicia o loop de escuta de comandos do Telegram via Long Polling."""
     # Ativa trava de instância única para o bot interativo
@@ -397,6 +433,9 @@ def escutar_comandos():
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         print("[BOT TELEGRAM] TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não definidos.")
         return
+
+    # Inicia heartbeat em background
+    iniciar_heartbeat()
 
     print("🤖 [BOT TELEGRAM INTERATIVO] Escutando comandos... (Pressione Ctrl+C para parar)")
     offset = 0
@@ -414,6 +453,7 @@ def escutar_comandos():
         except Exception as e:
             print(f"[ERRO BOT TELEGRAM] {e}")
             time.sleep(5)
+
 
 if __name__ == "__main__":
     escutar_comandos()

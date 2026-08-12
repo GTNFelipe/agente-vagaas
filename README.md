@@ -31,6 +31,9 @@ agente-vagaas/
 ├── schema_supabase.sql        # Script DDL completo de tabelas e permissões do Supabase
 ├── weekly_report.py           # Script de geração do relatório semanal (E-mail + Telegram)
 ├── main.py                    # Orquestrador principal do pipeline
+├── iniciar_bot.bat            # Script Batch Watchdog com loop de auto-restart
+├── iniciar_bot_silencioso.vbs # Launcher em segundo plano sem janela de console (Windows)
+├── Procfile                   # Configuração de Worker para deploy 24/7 na nuvem (Render/Railway)
 ├── requirements.txt           # Dependências do projeto
 └── README.md                  # Documentação completa do projeto
 ```
@@ -279,16 +282,19 @@ TELEGRAM_CHAT_ID=seu_chat_id_telegram
 
 ---
 
-## 📱 Comandos Interativos do Telegram
+## 📱 Comandos Interativos do Telegram & Resiliência
 
 Interaja com o robô em tempo real enviando os comandos:
 
-- **💬 Texto Livre de Vaga**: Cole qualquer descrição completa de vaga no chat para receber o CV (PDF), Dossiê (MD) e Carta (TXT), com disparo de candidatura por e-mail se houver RH no texto.
+- **`🏓 /ping`**: Testa a conectividade com o bot ao vivo, retornando o horário local, tempo de atividade (Uptime) e confirmação de conexão.
+- **`💬 Texto Livre de Vaga`**: Cole qualquer descrição completa de vaga no chat para receber o CV (PDF), Dossiê (MD) e Carta (TXT), com disparo de candidatura por e-mail se houver RH no texto.
 - **`/vaga <descrição>`**: Comando explícito para analisar uma vaga via texto.
 - **`/relatorio`**: Exibe o relatório sob demanda (`⚡ [RELATÓRIO SOB DEMANDA - /relatorio]`).
 - **`/status`**: Exibe a cota ao vivo da SerpAPI e estatísticas de vagas do Supabase.
 - **`/buscar`**: Dispara uma varredura completa por novas vagas na web.
 - **`/ajuda`**: Exibe o menu com todos os comandos disponíveis.
+
+> 💓 **Thread de Heartbeat (Ping de Conexão)**: O bot possui um processo em segundo plano que executa um ping a cada 5 minutos na API do Telegram. Isso mantém o socket ativo, evita desconexões por ociosidade da rede e garante resposta imediata.
 
 ---
 
@@ -312,34 +318,41 @@ Interaja com o robô em tempo real enviando os comandos:
 
 ---
 
-## 🚀 Como Executar Localmente
+## 🚀 Como Executar e Manter o Bot 24/7
 
-1. **Clone o repositório:**
-   ```bash
-   git clone https://github.com/GTNFelipe/agente-vagaas.git
-   cd agente-vagaas
-   ```
+### 1. Execução Local Simples
+```bash
+# Clone e entre no repositório
+git clone https://github.com/GTNFelipe/agente-vagaas.git
+cd agente-vagaas
 
-2. **Crie e ative um ambiente virtual Python:**
-   ```bash
-   python -m venv .venv
-   # Windows:
-   .venv\Scripts\activate
-   # Linux/macOS:
-   source .venv/bin/activate
-   ```
+# Crie e ative o ambiente virtual
+python -m venv .venv
+.venv\Scripts\activate
 
-3. **Instale as dependências:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Instale as dependências
+pip install -r requirements.txt
 
-4. **Execute uma busca completa de vagas:**
-   ```bash
-   python main.py
-   ```
+# Execute a varredura manual de vagas:
+python main.py
 
-5. **Inicie o Bot Interativo do Telegram:**
-   ```bash
-   python modules/telegram_bot.py
-   ```
+# Inicie o Bot Interativo do Telegram:
+python modules/telegram_bot.py
+```
+
+### 2. Modo Watchdog com Auto-Restart (Local)
+Para evitar que o bot feche por oscilações na conexão de rede, utilize os scripts inclusos:
+- **Janela de Console**: Clique duas vezes em `iniciar_bot.bat` (reinicia o bot automaticamente se houver qualquer falha).
+- **Em Segundo Plano (Sem Janela)**: Clique duas vezes em `iniciar_bot_silencioso.vbs`.
+
+### 3. Início Automático com o Windows
+Para o bot ligar automaticamente sempre que seu computador for ligado:
+1. Pressione `Win + R`, digite `shell:startup` e pressione **Enter**.
+2. Crie um atalho do arquivo `iniciar_bot_silencioso.vbs` dentro desta pasta.
+
+### 4. Deploy Gratuito 24/7 na Nuvem (Render / Railway)
+Se preferir que o bot fique online **24 horas por dia sem precisar manter o PC ligado**:
+1. Suba o repositório no GitHub.
+2. Acesse [Render.com](https://render.com) e crie um **Background Worker** gratuito.
+3. Conecte ao repositório (ele utilizará o [`Procfile`](file:///c:/Users/Felipe/Documents/GITHUB/agente-vagas/Procfile) automaticamente).
+4. Configure as variáveis de ambiente (`.env`) no painel do Render.
