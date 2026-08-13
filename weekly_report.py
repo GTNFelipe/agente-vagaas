@@ -14,8 +14,10 @@ def gerar_relatorio_semanal():
         return
 
     try:
-        res = supabase.table("vagas_processadas").select("*").execute()
-        dados = res.data
+        from datetime import datetime, timezone, timedelta
+        sete_dias_atras = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        res = supabase.table("vagas_processadas").select("*").gte("created_at", sete_dias_atras).execute()
+        dados = res.data or []
 
         total_vagas = len(dados)
         candidatadas_auto = len([v for v in dados if v.get("status_candidatura") == "candidatado_auto"])

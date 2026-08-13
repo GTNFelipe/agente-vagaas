@@ -71,14 +71,17 @@ CREATE INDEX IF NOT EXISTS idx_curriculos_vaga_id ON public.curriculos_gerados(v
 CREATE INDEX IF NOT EXISTS idx_dossies_vaga_id ON public.prep_dossies(vaga_id);
 
 -- ==============================================================================
--- DESABILITA RLS (Row Level Security) OU LIBERA PERMISSÕES DE LEITURA/ESCRITA
+-- PERMISSÕES E SEGURANÇA (Row Level Security - RLS)
+-- Recomendado: Habilitar RLS e permitir operações seguras via API Key
 -- ==============================================================================
-ALTER TABLE public.vagas DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vagas_processadas DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.curriculos_gerados DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.prep_dossies DISABLE ROW LEVEL SECURITY;
 
+-- Libera permissões de execução para os perfis autorizados da aplicação
 GRANT ALL ON public.vagas TO anon, authenticated, service_role;
 GRANT ALL ON public.vagas_processadas TO anon, authenticated, service_role;
 GRANT ALL ON public.curriculos_gerados TO anon, authenticated, service_role;
 GRANT ALL ON public.prep_dossies TO anon, authenticated, service_role;
+
+-- (Opcional - Recomendado para produção pública) Habilitar RLS com Política Aberta para Bot:
+-- ALTER TABLE public.vagas ENABLE ROW LEVEL SECURITY;
+-- CREATE POLICY "Permitir Acesso Total Bot" ON public.vagas FOR ALL USING (true);
+

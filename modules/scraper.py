@@ -19,6 +19,12 @@ except ImportError:
 
 SERPAPI_TRACKER_FILE = "serpapi_daily_tracker.json"
 
+HTTP_SESSION = requests.Session()
+HTTP_SESSION.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
+})
+
 def obter_orcamento_diario_serpapi() -> dict:
     """
     Consulta o SerpAPI para obter o saldo de pesquisas restantes e a data de renovação.
@@ -30,7 +36,7 @@ def obter_orcamento_diario_serpapi() -> dict:
     
     try:
         url = f"https://serpapi.com/account?api_key={api_key}"
-        resp = requests.get(url, timeout=10)
+        resp = HTTP_SESSION.get(url, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             restantes = data.get("total_searches_left", 0)
@@ -163,7 +169,7 @@ def buscar_vagas_rss_feed() -> list:
 
     for url in rss_urls:
         try:
-            response = requests.get(url, timeout=10)
+            response = HTTP_SESSION.get(url, timeout=10)
             if response.status_code == 200:
                 soup = BeautifulSoup(response.content, features="xml")
                 items = soup.find_all("item")
@@ -257,12 +263,14 @@ CARGOS_EXCLUIDOS_REGEX = [
     r'\bscrum\s*master\b', r'\bagile\s*coach\b', r'\bproduct\s*owner\b', r'\bproduct\s*manager\b',
     r'\bdesigner\b', r'\bux\b', r'\bui\b'
 ]
+CARGOS_EXCLUIDOS_COMPILED = [re.compile(p, re.IGNORECASE) for p in CARGOS_EXCLUIDOS_REGEX]
 
 SENIORIDADE_ALTA_REGEX = [
     r'\bs[eê]nior\b', r'\bsr\.?\b', r'\bsnr\b',
     r'\blead\b', r'\bl[ií]der\b', r'\bcoordenador\b', r'\bgerente\b', r'\bmanager\b',
     r'\bhead\b', r'\bdiretor\b', r'\barquitet[oa]\b', r'\barchitect\b', r'\bespecialista\b', r'\bspecialist\b'
 ]
+SENIORIDADE_ALTA_COMPILED = [re.compile(p, re.IGNORECASE) for p in SENIORIDADE_ALTA_REGEX]
 
 def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
     """
@@ -276,15 +284,15 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
     texto_completo = f"{titulo} {descricao}"
 
     # 1. Descarte imediato de áreas/funções não desejadas no título (Ensino, Vendas, Cloud, DevOps, SRE, Dados, Suporte)
-    for area in CARGOS_EXCLUIDOS_REGEX:
-        if re.search(area, titulo, re.IGNORECASE):
-            print(f"[FILTRO ÁREA EXCLUÍDA] Vaga descartada por ser de área/função não desejada ({area}): '{vaga.get('titulo')}'")
+    for area_pat in CARGOS_EXCLUIDOS_COMPILED:
+        if area_pat.search(titulo):
+            print(f"[FILTRO ÁREA EXCLUÍDA] Vaga descartada por ser de área/função não desejada ({area_pat.pattern}): '{vaga.get('titulo')}'")
             return False
 
     # 2. Descarte imediato de senioridade alta (Sênior, Lead, Gerente, Especialista, Architect)
-    for sen in SENIORIDADE_ALTA_REGEX:
-        if re.search(sen, titulo, re.IGNORECASE):
-            print(f"[FILTRO SENIORIDADE ALTA] Vaga descartada por ser de nível Sênior/Lead ({sen}): '{vaga.get('titulo')}'")
+    for sen_pat in SENIORIDADE_ALTA_COMPILED:
+        if sen_pat.search(titulo):
+            print(f"[FILTRO SENIORIDADE ALTA] Vaga descartada por ser de nível Sênior/Lead ({sen_pat.pattern}): '{vaga.get('titulo')}'")
             return False
 
     # 3. Validação de Título: Deve se enquadrar como Desenvolvedor/Programador/Engenheiro ou Analista/Trainee/Low-code
@@ -503,7 +511,7 @@ def buscar_vagas_programathor() -> list:
     }
 
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = HTTP_SESSION.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, "html.parser")
             containers = soup.find_all("div", class_=lambda c: c and "cell-list" in c)
@@ -553,7 +561,7 @@ def buscar_vagas_github_repos() -> list:
     for repo in repos:
         try:
             url = f"https://api.github.com/repos/{repo}/issues?state=open&per_page=15"
-            resp = requests.get(url, headers=headers, timeout=10)
+            resp = HTTP_SESSION.get(url, headers=headers, timeout=10)
             if resp.status_code == 200:
                 issues = resp.json()
                 for issue in issues:
@@ -587,7 +595,7 @@ def buscar_vagas_linkedin_publico(keywords: str, location: str = "Brasil") -> li
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
         }
-        resp = requests.get(url_search, headers=headers, timeout=10)
+        resp = HTTP_SESSION.get(url_search, headers=headers, timeout=10)
         if resp.status_code != 200:
             return vagas
 
@@ -615,7 +623,7 @@ def buscar_vagas_linkedin_publico(keywords: str, location: str = "Brasil") -> li
                 if job_id:
                     try:
                         url_detail = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
-                        r_det = requests.get(url_detail, headers=headers, timeout=8)
+                        r_det = HTTP_SESSION.get(url_detail, headers=headers, timeout=8)
                         if r_det.status_code == 200:
                             soup_det = BeautifulSoup(r_det.text, 'html.parser')
                             desc_elem = soup_det.find('div', class_='show-more-less-html__markup')
@@ -732,7 +740,7 @@ def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
     }
 
     try:
-        response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+        response = HTTP_SESSION.get(url, headers=headers, timeout=timeout, allow_redirects=True)
 
         if response.status_code >= 400:
             print(f"[VALIDAÇÃO] Link inativo ou indisponível (HTTP {response.status_code}): {url}")
@@ -820,7 +828,7 @@ def extrair_email_profundo(url: str, timeout: int = 8) -> str:
     }
 
     try:
-        response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+        response = HTTP_SESSION.get(url, headers=headers, timeout=timeout, allow_redirects=True)
         if response.status_code >= 400:
             return None
 

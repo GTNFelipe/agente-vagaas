@@ -134,7 +134,7 @@ def main(manual: bool = False):
             salvar_vaga_processada(supabase_client, vaga, analise, status_candidatura=status_envio)
             vagas_novas_processadas += 1
 
-            # Limpeza automática: Deleta os arquivos temporários após envio (mantendo salvos 100% no Supabase)
+            # Limpeza automática segura: Deleta os arquivos temporários após envio
             for temp_file in [caminho_pdf, caminho_dossie, caminho_carta]:
                 if temp_file and os.path.exists(temp_file):
                     try:
@@ -145,7 +145,7 @@ def main(manual: bool = False):
             print(f"[INFO] Vaga descartada (Score {match_score}% < 80%).")
             salvar_vaga_processada(supabase_client, vaga, analise, status_candidatura="descartado")
 
-        time.sleep(20)
+        time.sleep(3)
 
     # Notifica o Telegram com o resumo completo da varredura
     notificar_resumo_varredura(vagas_coletadas=len(vagas_encontradas), vagas_novas_processadas=vagas_novas_processadas, manual=manual)

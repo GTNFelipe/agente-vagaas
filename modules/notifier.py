@@ -83,7 +83,7 @@ def realizar_candidatura_auto_email(vaga_info: dict, analise_ia: dict, caminho_p
             msg.attach(pdf_attachment)
 
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15) as server:
             server.login(remetente, senha_app)
             destinatarios = [email_recrutador, remetente]
             server.send_message(msg, to_addrs=destinatarios)

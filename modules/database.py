@@ -13,7 +13,13 @@ except ImportError:
 
 LOCAL_DB_FILE = "vagas_processadas.json"
 
+_SUPABASE_INSTANCE: Optional[Client] = None
+
 def inicializar_supabase() -> Optional[Client]:
+    global _SUPABASE_INSTANCE
+    if _SUPABASE_INSTANCE is not None:
+        return _SUPABASE_INSTANCE
+
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     env_file = os.path.join(base_dir, ".env")
     if os.path.exists(env_file):
@@ -35,7 +41,8 @@ def inicializar_supabase() -> Optional[Client]:
         print(f"[AVISO] SUPABASE_URL ou SUPABASE_KEY nao encontradas nas variaveis de ambiente.")
         return None
     try:
-        return create_client(url, key)
+        _SUPABASE_INSTANCE = create_client(url, key)
+        return _SUPABASE_INSTANCE
     except Exception as e:
         print(f"[ERRO INIT SUPABASE] Falha ao conectar no Supabase: {e}")
         return None

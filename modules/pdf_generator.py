@@ -1,4 +1,5 @@
 import os
+import html
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -57,15 +58,23 @@ def gerar_pdf_curriculo(perfil_base: dict, analise_ia: dict, output_filename: st
 
     # 1. Cabeçalho
     contato = perfil_base.get("contato", {})
-    info_contato = f"{perfil_base.get('cargo_atual')} | {perfil_base.get('localizacao')} | Email: {contato.get('email')} | Tel: {contato.get('phone')} | LinkedIn: {contato.get('linkedin')}"
+    nome_esc = html.escape(str(perfil_base.get('nome', 'Candidato')))
+    cargo_esc = html.escape(str(perfil_base.get('cargo_atual', '')))
+    loc_esc = html.escape(str(perfil_base.get('localizacao', '')))
+    email_esc = html.escape(str(contato.get('email', '')))
+    phone_esc = html.escape(str(contato.get('phone', '')))
+    linkedin_esc = html.escape(str(contato.get('linkedin', '')))
+
+    info_contato = f"{cargo_esc} | {loc_esc} | Email: {email_esc} | Tel: {phone_esc} | LinkedIn: {linkedin_esc}"
     
-    story.append(Paragraph(f"<b>{perfil_base.get('nome')}</b>", title_style))
+    story.append(Paragraph(f"<b>{nome_esc}</b>", title_style))
     story.append(Paragraph(info_contato, contact_style))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#CBD5E0'), spaceAfter=10))
 
     # 2. Resumo Adaptado
     story.append(Paragraph("<b>RESUMO PROFISSIONAL</b>", section_style))
-    story.append(Paragraph(analise_ia.get("resumo_adaptado", perfil_base.get("resumo_profissional")), body_style))
+    resumo_raw = str(analise_ia.get("resumo_adaptado") or perfil_base.get("resumo_profissional") or "")
+    story.append(Paragraph(html.escape(resumo_raw), body_style))
     story.append(Spacer(1, 10))
 
     # 3. Habilidades Destacadas (100% Fatuais)
@@ -86,10 +95,10 @@ def gerar_pdf_curriculo(perfil_base: dict, analise_ia: dict, output_filename: st
         # Garante que nao insira alucinaçoes nao presentes no perfil (ex: Cypress, Playwright, Selenium, RestAssured)
         alucinacoes = ["cypress", "playwright", "selenium", "restassured", "angular", "vue", "react native", "kubernetes"]
         if not any(aluc in hab_str.lower() for aluc in alucinacoes if not any(aluc in sa.lower() for sa in skills_autorizadas)):
-            habilidades_lista.append(hab_str)
+            habilidades_lista.append(html.escape(hab_str))
             
     if not habilidades_lista:
-        habilidades_lista = skills_autorizadas[:8]
+        habilidades_lista = [html.escape(sa) for sa in skills_autorizadas[:8]]
     
     skills_text = ", ".join(habilidades_lista)
     story.append(Paragraph(skills_text, body_style))
@@ -98,17 +107,23 @@ def gerar_pdf_curriculo(perfil_base: dict, analise_ia: dict, output_filename: st
     # 4. Experiências Profissionais
     story.append(Paragraph("<b>EXPERIÊNCIA PROFISSIONAL</b>", section_style))
     for exp in perfil_base.get("experiencias", []):
-        header_exp = f"<b>{exp.get('cargo')}</b> - {exp.get('empresa')} ({exp.get('periodo')})"
+        carg_exp = html.escape(str(exp.get('cargo', '')))
+        emp_exp = html.escape(str(exp.get('empresa', '')))
+        per_exp = html.escape(str(exp.get('periodo', '')))
+        header_exp = f"<b>{carg_exp}</b> - {emp_exp} ({per_exp})"
         story.append(Paragraph(header_exp, body_style))
         for item in exp.get("detalhes", []):
-            story.append(Paragraph(f"• {item}", body_style))
+            story.append(Paragraph(f"• {html.escape(str(item))}", body_style))
         story.append(Spacer(1, 6))
 
     # 5. Formação Acadêmica
     story.append(Spacer(1, 4))
     story.append(Paragraph("<b>FORMAÇÃO ACADÊMICA</b>", section_style))
     for form in perfil_base.get("formacao", []):
-        form_text = f"<b>{form.get('curso')}</b> - {form.get('instituicao')} (Conclusão: {form.get('conclusao')})"
+        cur_f = html.escape(str(form.get('curso', '')))
+        inst_f = html.escape(str(form.get('instituicao', '')))
+        conc_f = html.escape(str(form.get('conclusao', '')))
+        form_text = f"<b>{cur_f}</b> - {inst_f} (Conclusão: {conc_f})"
         story.append(Paragraph(form_text, body_style))
 
     doc.build(story)
