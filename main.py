@@ -41,7 +41,7 @@ def extrair_email_texto(texto: str) -> str:
     emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', texto)
     return emails[0] if emails else None
 
-def main(manual: bool = False):
+def main(manual: bool = False, target_chat_id: str = None):
     print("[INICIO] Executando Agente de Vagas & Candidatura Autonoma (Fase 3)...")
     
     perfil_base = carregar_perfil_base()
@@ -53,21 +53,28 @@ def main(manual: bool = False):
 
     if not vagas_encontradas:
         print("[INFO] Nenhuma vaga encontrada nesta rodada.")
-        notificar_resumo_varredura(vagas_coletadas=0, vagas_novas_processadas=0, manual=manual)
+        notificar_resumo_varredura(vagas_coletadas=0, vagas_novas_processadas=0, manual=manual, chat_id=target_chat_id)
         return
 
     # 2. Processamento
     vagas_novas_processadas = 0
+    vagas_duplicadas = 0
+    vagas_encerradas = 0
+    vagas_descartadas_score = 0
+    vagas_auto_applied = 0
+
     for vaga in vagas_encontradas:
         link = vaga.get("link")
         titulo = vaga.get("titulo")
 
         if vaga_ja_processada(supabase_client, vaga):
+            vagas_duplicadas += 1
             print(f"[SKIP] Vaga ja registrada/candidatada: '{titulo}' ({vaga.get('empresa')}). Pulando...")
             continue
 
         # Validação de status em tempo real na web
         if link and not vaga_ainda_ativa(link):
+            vagas_encerradas += 1
             print(f"[SKIP] Vaga ENCERRADA ou Inativa na web: '{titulo}' ({vaga.get('empresa')}). Pulando...")
             salvar_vaga_processada(supabase_client, vaga, {"match_score": 0, "justificativa_match": "Vaga encerrada ou inativa na web"}, status_candidatura="encerrada")
             continue
@@ -119,6 +126,7 @@ def main(manual: bool = False):
                 sucesso_apply = realizar_candidatura_auto_email(vaga, analise, caminho_pdf)
                 if sucesso_apply:
                     status_envio = "candidatado_auto"
+                    vagas_auto_applied += 1
 
             # Envia cópia / alerta para o desenvolvedor anexando o CV, Dossiê e Carta
             enviar_notificacao_vaga(
@@ -142,13 +150,23 @@ def main(manual: bool = False):
                     except Exception as e:
                         print(f"[AVISO] Erro ao remover arquivo temporario ({temp_file}): {e}")
         else:
+            vagas_descartadas_score += 1
             print(f"[INFO] Vaga descartada (Score {match_score}% < 80%).")
             salvar_vaga_processada(supabase_client, vaga, analise, status_candidatura="descartado")
 
         time.sleep(3)
 
-    # Notifica o Telegram com o resumo completo da varredura
-    notificar_resumo_varredura(vagas_coletadas=len(vagas_encontradas), vagas_novas_processadas=vagas_novas_processadas, manual=manual)
+    # Notifica o Telegram com o resumo detalhado completo da varredura
+    notificar_resumo_varredura(
+        vagas_coletadas=len(vagas_encontradas),
+        vagas_novas_processadas=vagas_novas_processadas,
+        vagas_duplicadas=vagas_duplicadas,
+        vagas_encerradas=vagas_encerradas,
+        vagas_descartadas_score=vagas_descartadas_score,
+        vagas_auto_applied=vagas_auto_applied,
+        manual=manual,
+        chat_id=target_chat_id
+    )
     print("\n[SUCESSO] Execucao completa finalizada com sucesso!")
 
 if __name__ == "__main__":

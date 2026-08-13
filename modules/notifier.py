@@ -2,6 +2,7 @@ import os
 import re
 import html
 import smtplib
+import requests
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
@@ -182,15 +183,24 @@ def enviar_notificacao_telegram(vaga_info: dict, analise_ia: dict, caminho_pdf: 
 
     return True
 
-def notificar_resumo_varredura(vagas_coletadas: int, vagas_novas_processadas: int, manual: bool = False):
+def notificar_resumo_varredura(
+    vagas_coletadas: int,
+    vagas_novas_processadas: int,
+    vagas_duplicadas: int = 0,
+    vagas_encerradas: int = 0,
+    vagas_descartadas_score: int = 0,
+    vagas_auto_applied: int = 0,
+    manual: bool = False,
+    chat_id: str = None
+):
     """
-    Envia uma mensagem de feedback no Telegram após a conclusão de qualquer varredura (automática 8x/dia ou manual).
-    Informa claramente o status, a quantidade de vagas e se nenhuma vaga nova foi encontrada.
+    Envia uma mensagem de feedback detalhada no Telegram após a conclusão de qualquer varredura (automática 8x/dia ou manual).
+    Explica exatamente o resultado da execução, justificando o porquê de cada vaga ter sido aceita, descartada ou pulada.
     """
     token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    target_chat = chat_id or os.getenv("TELEGRAM_CHAT_ID")
 
-    if not token or not chat_id:
+    if not token or not target_chat:
         return False
 
     from datetime import datetime, timezone, timedelta
@@ -198,25 +208,34 @@ def notificar_resumo_varredura(vagas_coletadas: int, vagas_novas_processadas: in
     hora_atual = datetime.now(fuso_brt).strftime("%H:%M")
 
     origem = "Manual (/buscar)" if manual else "Automática (Cron 8x/dia)"
+    alertas_manuais = max(0, vagas_novas_processadas - vagas_auto_applied)
 
     if vagas_novas_processadas > 0:
-        texto = f"""🔍 <b>[VARREDURA CONCLUÍDA - {origem}]</b>
-⏰ <b>Horário:</b> {hora_atual} (BRT)
-
-✅ <b>Resultado:</b> {vagas_novas_processadas} nova(s) vaga(s) qualificada(s) e processada(s) nesta rodada!
-<i>(Todas as notificações com CV, Dossiê e Carta foram enviadas acima).</i>"""
+        mensagem_motivo = f"✅ <b>Sucesso:</b> {vagas_novas_processadas} vaga(s) qualificada(s) com Match >= 80%!\n<i>(Currículo PDF, Dossiê e Carta de Apresentação gerados e anexados acima).</i>"
+    elif vagas_coletadas == 0:
+        mensagem_motivo = "ℹ️ <b>Motivo:</b> Nenhuma nova vaga foi retornada pelas fontes de busca nesta rodada. Isso pode ocorrer por ausência de novas publicações recentes nas plataformas monitoradas."
     else:
-        texto = f"""🔍 <b>[VARREDURA CONCLUÍDA - {origem}]</b>
+        mensagem_motivo = f"ℹ️ <b>Motivo:</b> Todas as {vagas_coletadas} vagas coletadas foram filtradas e nenhuma nova vaga atingiu a qualificação de 80%."
+
+    texto = f"""🔍 <b>[RELATÓRIO DE VARREDURA - {origem}]</b>
 ⏰ <b>Horário:</b> {hora_atual} (BRT)
 
-ℹ️ <b>Resultado:</b> Nenhuma vaga nova qualificada encontrada nesta rodada.
-(Vagas raspadas: {vagas_coletadas} | Todas já cadastradas anteriormente ou fora do perfil).
+📊 <b>Resumo Detalhado da Execução:</b>
+• 📥 <b>Vagas Coletadas na Web:</b> {vagas_coletadas}
+• 🔄 <b>Já Processadas (Duplicatas):</b> {vagas_duplicadas}
+• 🚫 <b>Inativas / Encerradas na Web:</b> {vagas_encerradas}
+• 📉 <b>Descartadas (Match < 80%):</b> {vagas_descartadas_score}
+• 🎯 <b>Vagas Qualificadas (Match >= 80%):</b> {vagas_novas_processadas}
+  ├── 🤖 <i>Auto-Applies por E-mail:</i> {vagas_auto_applied}
+  └── 📩 <i>Alertas para Candidatura Manual:</i> {alertas_manuais}
 
-🤖 <i>O agente continuará monitorando automaticamente na próxima execução agendada!</i>"""
+{mensagem_motivo}
+
+🤖 <i>O robô continuará monitorando a web automaticamente na próxima execução!</i>"""
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
-        "chat_id": chat_id,
+        "chat_id": target_chat,
         "text": texto,
         "parse_mode": "HTML"
     }
@@ -224,7 +243,7 @@ def notificar_resumo_varredura(vagas_coletadas: int, vagas_novas_processadas: in
     try:
         resp = requests.post(url, json=payload, timeout=10)
         if resp.status_code == 200:
-            print(f"[TELEGRAM] Resumo da varredura enviado com sucesso! ({vagas_novas_processadas} novas / {vagas_coletadas} coletadas)")
+            print(f"[TELEGRAM] Resumo detalhado da varredura enviado para {target_chat}! ({vagas_novas_processadas} qualificadas / {vagas_coletadas} coletadas)")
     except Exception as e:
         print(f"[ERRO TELEGRAM] Falha ao enviar resumo da varredura: {e}")
 
@@ -233,4 +252,3 @@ def notificar_resumo_varredura(vagas_coletadas: int, vagas_novas_processadas: in
 
 # Aliases para compatibilidade
 enviar_notificacao_vaga = enviar_notificacao_telegram
-send_job_notification = enviar_notificacao_telegram

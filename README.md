@@ -17,20 +17,21 @@ agente-vagaas/
 │       └── cron_weekly_report.yml # Relatório semanal de analytics (Domingo às 12h BRT)
 ├── modules/
 │   ├── __init__.py
-│   ├── scraper.py             # Varredura multicanal (SerpAPI, Programathor, GitHub, RSS) + Deep Scraping
-│   ├── tailor.py              # Análise de aderência, customização ATS e higienização factual via Groq LLM
-│   ├── pdf_generator.py       # Gerador de currículo em PDF limpo e factual via ReportLab
+│   ├── scraper.py             # Varredura multicanal (SerpAPI, Programathor, GitHub, RSS) + Session HTTP + Regexes
+│   ├── tailor.py              # Análise de aderência, customização ATS, isolamento contra Prompt Injection via Groq
+│   ├── pdf_generator.py       # Gerador de currículo em PDF limpo, com html.escape para ReportLab
 │   ├── dossier.py             # Gerador de Dossiê de Preparação para Entrevistas (Markdown)
 │   ├── cover_letter.py        # Gerador de Carta de Apresentação Profissional (TXT)
-│   ├── database.py            # Persistência, sanitização e sincronização de dados no Supabase
-│   ├── notifier.py            # Envio de Auto-Apply por Gmail SMTP e notificações no Telegram
-│   └── telegram_bot.py        # Bot Interativo do Telegram com Trava de Instância Única (Socket Lock)
+│   ├── database.py            # Persistência, cache local e cliente Singleton no Supabase
+│   ├── notifier.py            # Envio de Auto-Apply por Gmail SMTP e relatórios discriminados no Telegram
+│   └── telegram_bot.py        # Bot Interativo do Telegram com execução assíncrona (Thread Workers) e Socket Lock
 ├── master_profile.sample.json # Modelo de perfil sem informações sensíveis (Template)
 ├── master_profile.json        # Perfil mestre real do candidato (No .gitignore / Dados Sensíveis)
 ├── vagas_processadas.json     # Cache local anti-duplicata
-├── schema_supabase.sql        # Script DDL completo de tabelas e permissões do Supabase
-├── weekly_report.py           # Script de geração do relatório semanal (E-mail + Telegram)
-├── main.py                    # Orquestrador principal do pipeline
+├── schema_supabase.sql        # Script DDL completo de tabelas e permissões RLS do Supabase
+├── keep_alive_ping.py         # Monitoramento Keep-Alive 24/7 (Pings automáticos a cada 5m com Self-Healing)
+├── weekly_report.py           # Script de geração do relatório semanal de 7 dias (E-mail + Telegram)
+├── main.py                    # Orquestrador principal do pipeline (Delay otimizado de 3s)
 ├── iniciar_bot.bat            # Script Batch Watchdog com loop de auto-restart
 ├── iniciar_bot_silencioso.vbs # Launcher em segundo plano sem janela de console (Windows)
 ├── Procfile                   # Configuração de Worker para deploy 24/7 na nuvem (Render/Railway)
@@ -282,19 +283,18 @@ TELEGRAM_CHAT_ID=seu_chat_id_telegram
 
 ---
 
-## 📱 Comandos Interativos do Telegram & Resiliência
+## 📱 Comandos Interativos do Telegram & Resiliência 24/7
 
 Interaja com o robô em tempo real enviando os comandos:
 
-- **`🏓 /ping`**: Testa a conectividade com o bot ao vivo, retornando o horário local, tempo de atividade (Uptime) e confirmação de conexão.
 - **`💬 Texto Livre de Vaga`**: Cole qualquer descrição completa de vaga no chat para receber o CV (PDF), Dossiê (MD) e Carta (TXT), com disparo de candidatura por e-mail se houver RH no texto.
-- **`/vaga <descrição>`**: Comando explícito para analisar uma vaga via texto.
+- **`/vaga <descrição>`**: Comando explícito para analisar uma vaga enviada via texto.
 - **`/relatorio`**: Exibe o relatório sob demanda (`⚡ [RELATÓRIO SOB DEMANDA - /relatorio]`).
 - **`/status`**: Exibe a cota ao vivo da SerpAPI e estatísticas de vagas do Supabase.
-- **`/buscar`**: Dispara uma varredura completa por novas vagas na web.
-- **`/ajuda`**: Exibe o menu com todos os comandos disponíveis.
+- **`/buscar`**: Dispara uma varredura completa por novas vagas na web em **segundo plano (Assíncrono)**, permitindo que a conversa continue livre sem travamentos.
+- **`/ajuda`**: Exibe o menu interativo de ajuda.
 
-> 💓 **Thread de Heartbeat (Ping de Conexão)**: O bot possui um processo em segundo plano que executa um ping a cada 5 minutos na API do Telegram. Isso mantém o socket ativo, evita desconexões por ociosidade da rede e garante resposta imediata.
+> 🔄 **Monitor Keep-Alive Automático 24/7 (`keep_alive_ping.py`)**: O sistema executa um pinger autônomo a cada **5 minutos (300 segundos)** na API do Telegram. Caso ocorra qualquer oscilação de rede ou queda de processo, o monitoramento detecta a falha e **relança o bot automaticamente**, mantendo a aplicação acordada e operante 24 horas por dia.
 
 ---
 
@@ -338,11 +338,15 @@ python main.py
 
 # Inicie o Bot Interativo do Telegram:
 python modules/telegram_bot.py
+
+# Ou inicie o Monitor Keep-Alive 24/7 (que cuida do Ping de 5m e auto-restart):
+python keep_alive_ping.py
 ```
 
-### 2. Modo Watchdog com Auto-Restart (Local)
-Para evitar que o bot feche por oscilações na conexão de rede, utilize os scripts inclusos:
-- **Janela de Console**: Clique duas vezes em `iniciar_bot.bat` (reinicia o bot automaticamente se houver qualquer falha).
+### 2. Modo Watchdog & Keep-Alive 24/7 (Local)
+Para garantir que o bot nunca caia por oscilações na rede:
+- **Monitor Autônomo Keep-Alive 5m**: Execute `python keep_alive_ping.py` (efetua pings de 5 em 5 minutos e relança o bot se cair).
+- **Janela de Console Watchdog**: Clique duas vezes em `iniciar_bot.bat`.
 - **Em Segundo Plano (Sem Janela)**: Clique duas vezes em `iniciar_bot_silencioso.vbs`.
 
 ### 3. Início Automático com o Windows

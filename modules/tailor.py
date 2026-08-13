@@ -45,8 +45,9 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
     3. Reescreva o resumo profissional (resumo_adaptado) de forma altamente personalizada para ESTA vaga específica.
     
     ⚠️ REGRA DE INTEGRIDADE E VERACIDADE ABSOLUTA (MANDATÓRIO / ZERO MENTIRAS):
-    - É ESTRITAMENTE PROIBIDO INVENTAR OU ADICIONAR QUALQUER FERRAMENTA, LINGUAGEM, FRAMEWORK, EMPRESA OU EXPERIÊNCIA que NÃO esteja presente no PERFIL PROFISSIONAL BASE acima.
-    - JAMAIS invente ferramentas como Cypress, Playwright, Selenium, RestAssured, Angular, Vue, React, Kubernetes ou equivalentes se elas NÃO constarem no perfil base do candidato!
+    - É ESTRITAMENTE PROIBIDO INVENTAR OU ADICIONAR QUALQUER FERRAMENTA, LINGUAGEM, FRAMEWORK, CLOUD OU EXPERIÊNCIA que NÃO esteja presente no PERFIL PROFISSIONAL BASE acima.
+    - JAMAIS invente ferramentas ou nuvens como AWS, EC2, S3, Lambda, Azure, GCP, Cypress, Playwright, Selenium, RestAssured, Angular, Vue, React, Kubernetes ou equivalentes se elas NÃO constarem no perfil base do candidato!
+    - Se a vaga exige AWS ou nuvem e o candidato NÃO possui AWS no perfil base, NUNCA MINTA que ele já trabalhou com AWS. Apresente-o estritamente com suas habilidades reais (COBOL, Mainframe, Java, Python, Docker, APIs) e destaque sua facilidade de aprendizado e interesse na stack cloud da empresa.
     - Use APENAS as tecnologias e experiências reais descritas no perfil base (ex: Python, Java, COBOL, JCL, DB2, CICS, TSO, n8n, Docker, Linux, Git, Postgres, Supabase, Redis, Jira, Confluence, etc.).
     - Destaque as tecnologias e experiências DO PERFIL BASE que favorecem a vaga. Fale SEMPRE a verdade. Se o candidato não possui alguma tecnologia exigida pela vaga, foque exclusivamente nas habilidades reais e verdadeiras que ele possui que mais se aproximam. NUNCA MINTA.
 
@@ -104,12 +105,12 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
             # Remove qualquer habilidade alucinada que nao exista no master_profile.json
             hab_raw = resultado.get("habilidades_destacadas", [])
             hab_validas = []
+            alucinacoes_bloqueadas = ["aws", "ec2", "s3", "lambda", "azure", "gcp", "cypress", "playwright", "selenium", "restassured", "angular", "vue", "react native", "kubernetes"]
+            
             for item in hab_raw:
                 item_str = str(item).strip()
                 # Valida se contem termos autorizados do perfil
                 if any(skill in item_str.lower() for skill in skills_factuais) or len(hab_validas) < 3:
-                    # Remove alucinações conhecidas se nao estiverem no perfil
-                    alucinacoes_bloqueadas = ["cypress", "playwright", "selenium", "restassured", "angular", "vue", "react native", "kubernetes"]
                     if not any(aluc in item_str.lower() for aluc in alucinacoes_bloqueadas if not any(aluc in sf for sf in skills_factuais)):
                         hab_validas.append(item_str)
             

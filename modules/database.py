@@ -263,11 +263,3 @@ def salvar_dossie_entrevista(supabase: Optional[Client], vaga_id: Optional[str],
     except Exception as e:
         print(f"[ERRO] Erro ao salvar em 'prep_dossies': {e}")
     return None
-
-# Aliases para compatibilidade
-get_supabase_client = inicializar_supabase
-def save_job_record(job_title: str, company: str, job_description: str, tailored_data: dict) -> bool:
-    client = inicializar_supabase()
-    vaga_data = {"titulo": job_title, "empresa": company, "link": ""}
-    salvar_vaga_processada(client, vaga_data, tailored_data)
-    return client is not None

@@ -128,6 +128,3 @@ def gerar_pdf_curriculo(perfil_base: dict, analise_ia: dict, output_filename: st
 
     doc.build(story)
     return output_filename
-
-# Alias para compatibilidade
-generate_resume_pdf = gerar_pdf_curriculo
