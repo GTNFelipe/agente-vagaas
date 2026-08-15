@@ -4,6 +4,7 @@ import time
 import socket
 import threading
 import re
+import ctypes
 import requests
 from dotenv import load_dotenv
 
@@ -13,6 +14,37 @@ if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
+
+def prevenir_sono_sistema():
+    """Informa ao Windows que este processo exige o sistema ativo (impede suspensão por inatividade)."""
+    if sys.platform == "win32":
+        try:
+            ES_CONTINUOUS = 0x80000000
+            ES_SYSTEM_REQUIRED = 0x00000001
+            ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)
+            print("[POWER MANAGEMENT] Trava de inatividade ativada: Windows impedido de suspender o bot.")
+        except Exception as e:
+            print(f"[POWER MANAGEMENT] Aviso ao configurar trava de inatividade: {e}")
+
+ULTIMO_PING_ONLINE = time.time()
+
+def iniciar_heartbeat_monitor():
+    """Thread de Heartbeat que roda a cada 60s mantendo o socket e a conexão 24/7 sem dormir."""
+    def heartbeat_worker():
+        global ULTIMO_PING_ONLINE
+        while True:
+            time.sleep(60)
+            agora = time.time()
+            # Se passaram mais de 2 minutos sem resposta de update, força ping getMe para manter TCP vivo
+            if agora - ULTIMO_PING_ONLINE > 120:
+                try:
+                    res = requests.get(f"{API_URL}/getMe", timeout=10)
+                    if res.status_code == 200:
+                        ULTIMO_PING_ONLINE = agora
+                except Exception:
+                    pass
+    t = threading.Thread(target=heartbeat_worker, daemon=True)
+    t.start()
 
 def garantir_instancia_unica(port: int = 47891):
     """
@@ -395,7 +427,12 @@ Comandos disponíveis:
             enviar_mensagem_telegram(chat_id, "ℹ️ Para analisar uma vaga, envie a descrição completa da vaga nesta conversa ou use o comando <code>/vaga &lt;descrição&gt;</code>.")
 
 def escutar_comandos():
-    """Inicia o loop de escuta de comandos do Telegram via Long Polling."""
+    """Inicia o loop de escuta de comandos do Telegram via Long Polling ininterrupto (Anti-Sleep)."""
+    global ULTIMO_PING_ONLINE
+
+    # Evita que o Windows coloque o sistema ou a placa de rede em suspensão/dormir
+    prevenir_sono_sistema()
+
     # Ativa trava de instância única para o bot interativo
     _lock_socket = garantir_instancia_unica()
 
@@ -403,19 +440,40 @@ def escutar_comandos():
         print("[BOT TELEGRAM] TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não definidos.")
         return
 
-    print("🤖 [BOT TELEGRAM INTERATIVO] Escutando comandos... (Pressione Ctrl+C para parar)")
+    iniciar_heartbeat_monitor()
+
+    print("🤖 [BOT TELEGRAM INTERATIVO 24/7] Escutando comandos continuamente... (Pressione Ctrl+C para parar)")
     offset = 0
+
+    session = requests.Session()
+    session.headers.update({"Connection": "keep-alive"})
 
     while True:
         try:
-            url = f"{API_URL}/getUpdates?offset={offset}&timeout=20"
-            resp = requests.get(url, timeout=25)
+            url = f"{API_URL}/getUpdates?offset={offset}&timeout=15"
+            resp = session.get(url, timeout=(10, 25))
+            ULTIMO_PING_ONLINE = time.time()
+
             if resp.status_code == 200:
                 data = resp.json()
                 for update in data.get("result", []):
                     offset = update["update_id"] + 1
                     processar_mensagem(update)
-            time.sleep(1)
+            elif resp.status_code == 409:
+                print("[BOT TELEGRAM] Conflito (409) detectado. Reaguardando 5s...")
+                time.sleep(5)
+            else:
+                print(f"[BOT TELEGRAM] Código HTTP {resp.status_code}. Aguardando 3s...")
+                time.sleep(3)
+        except requests.exceptions.Timeout:
+            # Timeout normal do long polling (15s sem mensagens). Continua o loop imediatamente mantendo a conexão aquecida!
+            ULTIMO_PING_ONLINE = time.time()
+            continue
+        except requests.exceptions.RequestException as req_err:
+            print(f"[ERRO REDE TELEGRAM] Oscilação de conexão: {req_err}. Reconectando sessão HTTP em 3s...")
+            session = requests.Session()
+            session.headers.update({"Connection": "keep-alive"})
+            time.sleep(3)
         except Exception as e:
             print(f"[ERRO BOT TELEGRAM] {e}")
             time.sleep(5)
