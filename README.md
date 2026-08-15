@@ -348,11 +348,13 @@ Para garantir que o bot nunca caia por oscilações na rede:
 - **Monitor Autônomo Keep-Alive 5m**: Execute `python keep_alive_ping.py` (efetua pings de 5 em 5 minutos e relança o bot se cair).
 - **Janela de Console Watchdog**: Clique duas vezes em `iniciar_bot.bat`.
 - **Em Segundo Plano (Sem Janela)**: Clique duas vezes em `iniciar_bot_silencioso.vbs`.
+- **Encerrar Bot em Segundo Plano**: Clique duas vezes em `parar_bot.bat`.
 
 ### 3. Início Automático com o Windows
-Para o bot ligar automaticamente sempre que seu computador for ligado:
-1. Pressione `Win + R`, digite `shell:startup` e pressione **Enter**.
-2. Crie um atalho do arquivo `iniciar_bot_silencioso.vbs` dentro desta pasta.
+Para o bot ligar automaticamente em segundo plano sempre que seu computador for ligado:
+- **Ativar Início Automático**: Clique duas vezes em [`adicionar_ao_startup.bat`](file:///c:/Users/Felipe/Documents/GITHUB/agente-vagas/adicionar_ao_startup.bat).
+- **Desativar Início Automático**: Clique duas vezes em [`remover_do_startup.bat`](file:///c:/Users/Felipe/Documents/GITHUB/agente-vagas/remover_do_startup.bat).
+- *(Ou manualmente: Pressione `Win + R`, digite `shell:startup` e cole um atalho do `iniciar_bot_silencioso.vbs`).*
 
 ### 4. Deploy Gratuito 24/7 na Nuvem (Render / Railway)
 Se preferir que o bot fique online **24 horas por dia sem precisar manter o PC ligado**:
