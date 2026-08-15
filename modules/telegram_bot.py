@@ -5,6 +5,7 @@ import socket
 import threading
 import re
 import ctypes
+import html
 import requests
 from dotenv import load_dotenv
 
@@ -366,6 +367,87 @@ def processar_vaga_direta(chat_id: str, texto_vaga: str):
         traceback.print_exc()
         enviar_mensagem_telegram(chat_id, f"❌ <b>[ERRO AO PROCESSAR VAGA]</b> Falha ao analisar vaga: {e}")
 
+def comando_historico_vagas(chat_id: str):
+    """Envia o histórico de todas as vagas qualificadas armazenadas no banco de dados Supabase com o Currículo PDF anexo."""
+    supabase = inicializar_supabase()
+    if not supabase:
+        enviar_mensagem_telegram(chat_id, "⚠️ Supabase indisponível no momento.")
+        return
+
+    def worker_historico():
+        try:
+            res_vagas = supabase.table("vagas").select("*").order("created_at", desc=True).execute()
+            vagas = res_vagas.data or []
+
+            if not vagas:
+                enviar_mensagem_telegram(chat_id, "ℹ️ <b>Nenhuma vaga qualificada registrada no histórico ainda.</b>")
+                return
+
+            enviar_mensagem_telegram(chat_id, f"📋 <b>[HISTÓRICO DE VAGAS COM CURRÍCULOS PDF]</b>\nTotal de vagas qualificadas (Match >= 80%): <b>{len(vagas)}</b>\n\nGerando e enviando os currículos em PDF em anexo abaixo...")
+
+            perfil_base = main.carregar_perfil_base()
+            doc_url = f"{API_URL}/sendDocument"
+
+            for idx, v in enumerate(vagas, start=1):
+                vaga_id = v.get("id")
+                titulo = v.get("titulo", "Sem título")
+                empresa = v.get("empresa", "Empresa não informada")
+                score = v.get("match_score", 80)
+                link = v.get("link", "")
+                data_criacao = str(v.get("created_at", ""))[:10]
+                descricao = v.get("descricao") or titulo
+
+                analise_ia = None
+                if vaga_id:
+                    try:
+                        res_cg = supabase.table("curriculos_gerados").select("conteudo_json").eq("vaga_id", vaga_id).execute()
+                        if res_cg.data and len(res_cg.data) > 0:
+                            analise_ia = res_cg.data[0].get("conteudo_json")
+                    except Exception:
+                        pass
+
+                if not analise_ia:
+                    analise_ia = adaptar_curriculo(descricao, perfil_base)
+
+                clean_empresa = (re.sub(r'[^\w\-_]', '_', str(empresa)).strip("_")[:30]) or "Empresa"
+                nome_candidato_clean = (re.sub(r'[^\w\-_]', '_', str(perfil_base.get("nome", "Candidato"))).strip("_")[:30]) or "Candidato"
+                
+                pasta_cvs = "curriculos_gerados"
+                os.makedirs(pasta_cvs, exist_ok=True)
+                nome_pdf = f"CV_{nome_candidato_clean}_{clean_empresa}.pdf"
+                caminho_pdf = os.path.join(pasta_cvs, nome_pdf)
+
+                gerar_pdf_curriculo(perfil_base, analise_ia, output_filename=caminho_pdf)
+
+                link_html = f'<a href="{link}">🔗 Abrir Anúncio da Vaga</a>' if link and link.startswith("http") else "<i>Link indisponível</i>"
+                legenda_html = (
+                    f"<b>{idx}. {html.escape(titulo)}</b>\n"
+                    f"🏢 <b>Empresa:</b> {html.escape(empresa)}\n"
+                    f"🎯 <b>Match:</b> {score}%\n"
+                    f"📅 <b>Data:</b> {data_criacao}\n"
+                    f"{link_html}"
+                )
+
+                if os.path.exists(caminho_pdf):
+                    try:
+                        with open(caminho_pdf, "rb") as doc_file:
+                            files = {"document": (os.path.basename(caminho_pdf), doc_file)}
+                            data_form = {"chat_id": chat_id, "caption": legenda_html, "parse_mode": "HTML"}
+                            requests.post(doc_url, data=data_form, files=files, timeout=15)
+                    except Exception as e:
+                        print(f"[ERRO TELEGRAM HISTORICO] Falha ao enviar PDF: {e}")
+                    
+                    try:
+                        os.remove(caminho_pdf)
+                    except Exception:
+                        pass
+
+                time.sleep(1.2)
+        except Exception as e:
+            enviar_mensagem_telegram(chat_id, f"❌ <b>Erro ao carregar histórico com PDFs:</b> {e}")
+
+    threading.Thread(target=worker_historico, daemon=True).start()
+
 def processar_mensagem(update: dict):
     """Processa mensagens e comandos recebidos do Telegram."""
     message = update.get("message", {})
@@ -394,6 +476,7 @@ def processar_mensagem(update: dict):
 Comandos disponíveis:
 📊 /status - Exibe estatísticas de vagas e cota ao vivo.
 📅 /relatorio - Exibe o resumo de desempenho do dia de hoje (Daily Digest).
+📋 /historico ou /vagas - Lista todas as vagas qualificadas já encontradas.
 ⚡ /buscar - Dispara uma busca de vagas na web imediatamente.
 💼 /vaga &lt;descrição&gt; - Analisa uma vaga enviada via texto e gera CV, Dossiê e Carta.
 ❓ /ajuda - Exibe este menu de ajuda.
@@ -408,6 +491,9 @@ Comandos disponíveis:
         elif cmd == "/relatorio":
             rel_msg = gerar_relatorio_diario_telegram()
             enviar_mensagem_telegram(chat_id, rel_msg)
+
+        elif cmd in ["/historico", "/vagas"]:
+            comando_historico_vagas(chat_id)
 
         elif cmd == "/buscar":
             comando_buscar(chat_id)
