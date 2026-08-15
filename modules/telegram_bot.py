@@ -397,7 +397,7 @@ Comandos disponíveis:
 def escutar_comandos():
     """Inicia o loop de escuta de comandos do Telegram via Long Polling."""
     # Ativa trava de instância única para o bot interativo
-    garantir_instancia_unica()
+    _lock_socket = garantir_instancia_unica()
 
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         print("[BOT TELEGRAM] TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não definidos.")
