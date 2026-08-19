@@ -91,42 +91,77 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
         for tech in exp.get("tecnologias", []):
             skills_factuais.add(tech.lower().strip())
 
+    model_env = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+    modelos_candidatos = [
+        model_env,
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
+        "groq/compound",
+        "groq/compound-mini",
+        "qwen/qwen3.6-27b",
+    ]
+    modelos_para_testar = []
+    for m in modelos_candidatos:
+        if m and m not in modelos_para_testar:
+            modelos_para_testar.append(m)
+
     for tentativa in range(1, max_tentativas + 1):
-        try:
-            response = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1,
-                response_format={"type": "json_object"}
-            )
-            resultado = json.loads(response.choices[0].message.content)
-            
-            # POS-PROCESSAMENTO E HIGIENIZACAO DE SEGURANÇA:
-            # Remove qualquer habilidade alucinada que nao exista no master_profile.json
-            hab_raw = resultado.get("habilidades_destacadas", [])
-            hab_validas = []
-            alucinacoes_bloqueadas = ["aws", "ec2", "s3", "lambda", "azure", "gcp", "cypress", "playwright", "selenium", "restassured", "angular", "vue", "react native", "kubernetes"]
-            
-            for item in hab_raw:
-                item_str = str(item).strip()
-                # Valida se contem termos autorizados do perfil
-                if any(skill in item_str.lower() for skill in skills_factuais) or len(hab_validas) < 3:
-                    if not any(aluc in item_str.lower() for aluc in alucinacoes_bloqueadas if not any(aluc in sf for sf in skills_factuais)):
-                        hab_validas.append(item_str)
-            
-            if hab_validas:
-                resultado["habilidades_destacadas"] = hab_validas
+        for modelo_atual in modelos_para_testar:
+            try:
+                response = client.chat.completions.create(
+                    model=modelo_atual,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.1,
+                    response_format={"type": "json_object"}
+                )
+                
+                raw_content = response.choices[0].message.content.strip()
+                if raw_content.startswith("```"):
+                    raw_content = raw_content.split("```")[1]
+                    if raw_content.startswith("json"):
+                        raw_content = raw_content[4:]
+                    raw_content = raw_content.strip()
 
-            return resultado
+                resultado = json.loads(raw_content)
+                
+                # POS-PROCESSAMENTO E HIGIENIZACAO DE SEGURANÇA:
+                # Remove qualquer habilidade alucinada que nao exista no master_profile.json
+                hab_raw = resultado.get("habilidades_destacadas", [])
+                hab_validas = []
+                alucinacoes_bloqueadas = ["aws", "ec2", "s3", "lambda", "azure", "gcp", "cypress", "playwright", "selenium", "restassured", "angular", "vue", "react native", "kubernetes"]
+                
+                for item in hab_raw:
+                    item_str = str(item).strip()
+                    # Valida se contem termos autorizados do perfil
+                    if any(skill in item_str.lower() for skill in skills_factuais) or len(hab_validas) < 3:
+                        if not any(aluc in item_str.lower() for aluc in alucinacoes_bloqueadas if not any(aluc in sf for sf in skills_factuais)):
+                            hab_validas.append(item_str)
+                
+                if hab_validas:
+                    resultado["habilidades_destacadas"] = hab_validas
 
-        except RateLimitError as e:
-            if tentativa < max_tentativas:
-                msg_aviso = f"⚠️ Limite de taxa da Groq atingido. Aguardando {tempo_espera}s para tentar novamente ({tentativa}/{max_tentativas})..."
-                logger.warning(msg_aviso)
-                print(msg_aviso)
-                time.sleep(tempo_espera)
-                tempo_espera += 10
-            else:
+                return resultado
+
+            except RateLimitError as e:
+                if modelo_atual != modelos_para_testar[-1]:
+                    logger.warning(f"⚠️ Rate limit no modelo '{modelo_atual}'. Tentando modelo alternativo...")
+                    continue
+                if tentativa < max_tentativas:
+                    msg_aviso = f"⚠️ Limite de taxa da Groq atingido. Aguardando {tempo_espera}s para tentar novamente ({tentativa}/{max_tentativas})..."
+                    logger.warning(msg_aviso)
+                    print(msg_aviso)
+                    time.sleep(tempo_espera)
+                    tempo_espera += 10
+                else:
+                    raise e
+            except Exception as e:
+                err_str = str(e).lower()
+                if any(err_key in err_str for err_key in ["model_not_found", "model_decommissioned", "does not exist", "404", "413", "request_too_large", "entity too large"]):
+                    logger.warning(f"⚠️ Modelo '{modelo_atual}' indisponivel ou com erro ({e}). Tentando proximo modelo da lista...")
+                    continue
+                if modelo_atual != modelos_para_testar[-1]:
+                    logger.warning(f"⚠️ Erro inesperado no modelo '{modelo_atual}': {e}. Tentando modelo alternativo...")
+                    continue
                 raise e
 
 def _fallback_adaptacao(perfil_json: dict, descricao_vaga: str) -> dict:
