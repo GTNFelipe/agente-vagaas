@@ -25,43 +25,60 @@ HTTP_SESSION.headers.update({
     "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
 })
 
+def obter_chaves_serpapi() -> list:
+    """
+    Retorna a lista de chaves SerpAPI configuradas no ambiente.
+    Suporta múltiplas chaves separadas por vírgula no .env (ex: SERPAPI_KEY=chave1,chave2 ou SERPAPI_KEYS=chave1,chave2).
+    """
+    raw_keys = os.getenv("SERPAPI_KEYS") or os.getenv("SERPAPI_KEY") or ""
+    return [k.strip() for k in re.split(r"[,;\s]+", raw_keys) if k.strip()]
+
 def obter_orcamento_diario_serpapi() -> dict:
     """
-    Consulta o SerpAPI para obter o saldo de pesquisas restantes e a data de renovação.
-    Calcula dinamicamente a cota diária permitida (restantes // dias_restantes).
+    Consulta o SerpAPI para todas as chaves configuradas e soma o saldo de pesquisas restantes.
+    Calcula dinamicamente a cota diária permitida com base no saldo acumulado.
     """
-    api_key = os.getenv("SERPAPI_KEY")
-    if not api_key:
-        return {"limite_diario": 0, "restantes": 0, "dias_restantes": 0}
+    chaves = obter_chaves_serpapi()
+    if not chaves:
+        return {"limite_diario": 0, "restantes": 0, "dias_restantes": 0, "chaves_ativas": 0}
     
-    try:
-        url = f"https://serpapi.com/account?api_key={api_key}"
-        resp = HTTP_SESSION.get(url, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            restantes = data.get("total_searches_left", 0)
-            renovacao_str = data.get("plan_renewal_date", "")
-            
-            dias_restantes = 30
-            if renovacao_str:
-                try:
-                    data_renov = datetime.strptime(renovacao_str, "%Y-%m-%d").date()
-                    hoje = datetime.now().date()
-                    dias_restantes = max(1, (data_renov - hoje).days)
-                except Exception:
-                    pass
-            
-            limite_diario = max(1, restantes // dias_restantes) if restantes > 0 else 0
-            return {
-                "limite_diario": limite_diario,
-                "restantes": restantes,
-                "dias_restantes": dias_restantes,
-                "renovacao": renovacao_str
-            }
-    except Exception as e:
-        print(f"[AVISO SERPAPI BUDGET] Erro ao consultar cota SerpAPI: {e}")
+    total_restantes = 0
+    dias_restantes = 30
+    renovacao_str = ""
+    chaves_validas = 0
+
+    for api_key in chaves:
+        try:
+            url = f"https://serpapi.com/account?api_key={api_key}"
+            resp = HTTP_SESSION.get(url, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                restantes = data.get("total_searches_left", 0)
+                total_restantes += restantes
+                chaves_validas += 1
+                if not renovacao_str:
+                    renovacao_str = data.get("plan_renewal_date", "")
+                    if renovacao_str:
+                        try:
+                            data_renov = datetime.strptime(renovacao_str, "%Y-%m-%d").date()
+                            hoje = datetime.now().date()
+                            dias_restantes = max(1, (data_renov - hoje).days)
+                        except Exception:
+                            pass
+        except Exception as e:
+            print(f"[AVISO SERPAPI BUDGET] Erro ao consultar cota da chave {api_key[:8]}...: {e}")
     
-    return {"limite_diario": 1, "restantes": 39, "dias_restantes": 25}
+    if chaves_validas > 0:
+        limite_diario = max(1, total_restantes // dias_restantes) if total_restantes > 0 else 0
+        return {
+            "limite_diario": limite_diario,
+            "restantes": total_restantes,
+            "dias_restantes": dias_restantes,
+            "renovacao": renovacao_str,
+            "chaves_ativas": chaves_validas
+        }
+
+    return {"limite_diario": 1, "restantes": 39, "dias_restantes": 25, "chaves_ativas": len(chaves)}
 
 def pode_executar_busca_serpapi_hoje() -> tuple:
     """
@@ -114,47 +131,59 @@ def registrar_busca_serpapi_executada():
 
 def buscar_vagas_google_jobs(query: str, localizacao: str = "Brazil") -> list:
     """
-    Busca vagas no Google Jobs via SerpAPI (100 buscas grátis por mês).
+    Busca vagas no Google Jobs via SerpAPI com suporte a múltiplas chaves e failover automático.
+    Se a cota de uma chave acabar ou falhar, alterna para a próxima chave configurada.
     """
-    api_key = os.getenv("SERPAPI_KEY")
+    chaves = obter_chaves_serpapi()
     vagas_encontradas = []
 
-    if not api_key:
-        print("[AVISO] SERPAPI_KEY nao definida. Pulando busca no Google Jobs.")
+    if not chaves:
+        print("[AVISO] Nenhuma SERPAPI_KEY configurada. Pulando busca no Google Jobs.")
         return vagas_encontradas
 
     if GoogleSearch is None:
         print("[AVISO] Biblioteca 'google-search-results' nao instalada. Pulando busca no Google Jobs.")
         return vagas_encontradas
 
-    params = {
-        "engine": "google_jobs",
-        "q": query,
-        "location": localizacao,
-        "hl": "pt",
-        "gl": "br",
-        "api_key": api_key
-    }
+    for idx, api_key in enumerate(chaves, start=1):
+        params = {
+            "engine": "google_jobs",
+            "q": query,
+            "location": localizacao,
+            "hl": "pt",
+            "gl": "br",
+            "api_key": api_key
+        }
 
-    try:
-        search = GoogleSearch(params)
-        results = search.get_dict()
-        jobs_results = results.get("jobs_results", [])
+        try:
+            search = GoogleSearch(params)
+            results = search.get_dict()
 
-        for job in jobs_results:
-            apply_options = job.get("apply_options", [])
-            default_link = job.get("share_link", "")
-            link_vaga = escolher_melhor_link_gratuito(apply_options, default_link)
+            if "error" in results:
+                err_msg = str(results.get("error", ""))
+                print(f"[AVISO SERPAPI] Chave #{idx} ({api_key[:8]}...) retornou erro: '{err_msg}'. Alternando para a proxima chave...")
+                continue
 
-            vagas_encontradas.append({
-                "titulo": job.get("title"),
-                "empresa": job.get("company_name"),
-                "link": link_vaga,
-                "descricao": job.get("description", ""),
-                "fonte": "Google Jobs"
-            })
-    except Exception as e:
-        print(f"[ERRO] Erro ao buscar vagas no Google Jobs: {e}")
+            jobs_results = results.get("jobs_results", [])
+
+            for job in jobs_results:
+                apply_options = job.get("apply_options", [])
+                default_link = job.get("share_link", "")
+                link_vaga = escolher_melhor_link_gratuito(apply_options, default_link)
+
+                vagas_encontradas.append({
+                    "titulo": job.get("title"),
+                    "empresa": job.get("company_name"),
+                    "link": link_vaga,
+                    "descricao": job.get("description", ""),
+                    "fonte": "Google Jobs"
+                })
+
+            print(f"[SERPAPI SUCESSO] Busca concluida com a Chave #{idx} ({api_key[:8]}...). Retornou {len(vagas_encontradas)} vagas.")
+            return vagas_encontradas
+
+        except Exception as e:
+            print(f"[AVISO SERPAPI] Erro ao buscar com Chave #{idx} ({api_key[:8]}...): {e}. Alternando para a proxima chave...")
 
     return vagas_encontradas
 

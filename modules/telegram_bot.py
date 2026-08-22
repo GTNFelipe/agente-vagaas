@@ -105,23 +105,41 @@ def enviar_mensagem_telegram(chat_id: str, texto: str):
         print(f"[ERRO TELEGRAM] Falha ao enviar mensagem: {e}")
 
 def consultar_uso_serpapi() -> dict:
-    """Consulta os dados reais de uso da API SerpAPI diretamente na API oficial."""
-    api_key = os.getenv("SERPAPI_KEY")
-    if not api_key:
+    """Consulta os dados reais de uso da API SerpAPI diretamente na API oficial (consolida todas as chaves configuradas)."""
+    raw_keys = os.getenv("SERPAPI_KEYS") or os.getenv("SERPAPI_KEY") or ""
+    chaves = [k.strip() for k in re.split(r"[,;\s]+", raw_keys) if k.strip()]
+    if not chaves:
         return {}
-    try:
-        url = f"https://serpapi.com/account?api_key={api_key}"
-        resp = requests.get(url, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            return {
-                "usadas": data.get("this_month_usage", 0),
-                "restantes": data.get("total_searches_left", 0),
-                "limite": data.get("searches_per_month", 250),
-                "renovacao": data.get("plan_renewal_date", "N/A")
-            }
-    except Exception as e:
-        print(f"[ERRO SERPAPI ACCOUNT] {e}")
+
+    total_usadas = 0
+    total_restantes = 0
+    total_limite = 0
+    renovacao = "N/A"
+    chaves_validas = 0
+
+    for key in chaves:
+        try:
+            url = f"https://serpapi.com/account?api_key={key}"
+            resp = requests.get(url, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                total_usadas += data.get("this_month_usage", 0)
+                total_restantes += data.get("total_searches_left", 0)
+                total_limite += data.get("searches_per_month", 100)
+                if renovacao == "N/A":
+                    renovacao = data.get("plan_renewal_date", "N/A")
+                chaves_validas += 1
+        except Exception as e:
+            print(f"[ERRO SERPAPI ACCOUNT] {e}")
+
+    if chaves_validas > 0:
+        return {
+            "usadas": total_usadas,
+            "restantes": total_restantes,
+            "limite": total_limite,
+            "renovacao": renovacao,
+            "chaves_ativas": chaves_validas
+        }
     return {}
 
 def comando_status() -> str:

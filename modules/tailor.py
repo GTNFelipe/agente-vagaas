@@ -51,9 +51,14 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
     - Use APENAS as tecnologias e experiências reais descritas no perfil base (ex: Python, Java, COBOL, JCL, DB2, CICS, TSO, n8n, Docker, Linux, Git, Postgres, Supabase, Redis, Jira, Confluence, etc.).
     - Destaque as tecnologias e experiências DO PERFIL BASE que favorecem a vaga. Fale SEMPRE a verdade. Se o candidato não possui alguma tecnologia exigida pela vaga, foque exclusivamente nas habilidades reais e verdadeiras que ele possui que mais se aproximam. NUNCA MINTA.
 
+    ⚠️ FOCO TOTAL EM RESULTADOS E ENTREGAS (MANDATÓRIO):
+    - O resumo_adaptado, a cover_letter e o pitch_elevador DEVEM focar explicitamente nos RESULTADOS que o candidato gerou, nos problemas que resolveu e nas entregas concretas que realizou.
+    - Destaque o impacto de negócio das soluções desenvolvidas, métricas e escopos reais informados no perfil, em vez de apenas listar as tecnologias usadas.
+    - Na cover_letter e no pitch, posicione o candidato como um profissional orientado a agregar valor tangível à empresa e focado em resolver problemas reais.
+
     4. Selecione e reordene APENAS as habilidades técnicas reais do perfil base que sejam relevantes para essa vaga.
-    5. Escreva uma CARTA DE APRESENTAÇÃO profissional (cover_letter) curta, direta e 100% verdadeira (máximo 3 parágrafos) em 1ª pessoa, pronta para ser enviada ao recrutador.
-    6. Crie um DOSSIÊ DE PREPARAÇÃO PARA ENTREVISTA (dossie_entrevista) factual.
+    5. Escreva uma CARTA DE APRESENTAÇÃO profissional (cover_letter) curta, direta, focada em resultados e 100% verdadeira (máximo 3 parágrafos) em 1ª pessoa, pronta para ser enviada ao recrutador.
+    6. Crie um DOSSIÊ DE PREPARAÇÃO PARA ENTREVISTA (dossie_entrevista) factual. O pitch de elevador no dossiê deve ser orientado a entregas de valor.
 
     RETORNE ESTRITAMENTE UM JSON NO SEGUINTE FORMATO (Sem markdown em volta ou texto extra):
     {{
