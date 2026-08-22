@@ -2,7 +2,9 @@
 
 Agente autônomo em **Python 3.10+** desenvolvido para buscar, filtrar, analisar e aplicar automaticamente para vagas de Tecnologia no Brasil (com foco em **COBOL, Mainframe, Java Junior, Python Junior, Trainee TI, Analista de Sistemas e Automação / n8n / Low-code / No-code / Vibe Code**).
 
-O sistema utiliza a API da **Groq** (`llama-3.3-70b-versatile`) para calcular o score de aderência ATS (Match %), gerar currículos customizados em PDF via **ReportLab**, criar dossiês de preparação para entrevista e cartas de apresentação, enviando candidaturas automáticas por e-mail, registrando todo o histórico no **Supabase** (PostgreSQL) e fornecendo uma interface interativa completa via **Bot no Telegram**.
+O sistema utiliza a API da **Groq** (`llama-3.3-70b-versatile`) para calcular o score de aderência ATS (Match %), gerar currículos customizados em PDF via **ReportLab**, criar dossiês de preparação para entrevista e cartas de apresentação. **Todas as gerações de IA são estritamente orientadas a resultados e entregas (impacto real, métricas, valor gerado).**
+
+O agente envia candidaturas automáticas por e-mail, registrando todo o histórico no **Supabase** (PostgreSQL com Row Level Security ativo) e fornecendo uma interface interativa completa via **Bot no Telegram**, mantendo total observabilidade através de Logs Estruturados.
 
 ---
 
@@ -64,6 +66,7 @@ agente-vagaas/
 
 ### 🛡️ Regra de Veracidade Absoluta (Zero Mentiras / Zero Alucinação)
 - **Fonte Única da Verdade (`master_profile.json`)**: O gerador de currículos e cartas de apresentação é estritamente limitado ao histórico factual do candidato.
+- **Foco Absoluto em Resultados**: Os currículos, cartas de apresentação e dossiês gerados pelo Groq são parametrizados para destacar entregas, métricas e o impacto real gerado nos projetos anteriores.
 - **Bloqueio Factual de Ferramentas**: É terminantemente proibida a invenção de ferramentas ou linguagens inexistentes no perfil mestre (ex: *Cypress, Playwright, Selenium, RestAssured, React Native, Angular, Kubernetes* nunca são inseridos no currículo).
 - **Higienização em Camadas (Python Post-Processing)**: Em `modules/tailor.py` e `modules/pdf_generator.py`, qualquer habilidade sugerida pela IA que não esteja presente no conjunto de competências reais do candidato é sumariamente descartada pelo código antes da geração do PDF.
 
@@ -71,8 +74,8 @@ agente-vagaas/
 
 ### 🕵️‍♂️ Deep Scraping, Análise Direta no Telegram & Auto-Apply Inteligente
 - **Deep Scraping de Contatos**: Investiga o HTML da página oficial da vaga para extrair e-mails diretos de recrutadores (`recrutamento@`, `rh@`, `vagas@`, `talent@`).
-- **Análise Direta de Vagas via Telegram**: Envie a descrição de qualquer vaga diretamente no chat do Telegram (ou com `/vaga <descrição>`). O bot calcula o match de aderência e gera o **Currículo em PDF**, **Dossiê em Markdown** e **Carta de Apresentação em Texto**, retornando todos anexados no chat.
-- **Auto-Apply por E-mail**: Se o e-mail de RH for identificado na varredura web ou na descrição enviada pelo Telegram, o robô dispara a candidatura **100% no automático**, anexando o PDF `CV_[Nome]_[Empresa].pdf` e enviando uma cópia de confirmação para o e-mail do próprio candidato.
+- **Análise Direta de Vagas via Telegram**: Envie a descrição de qualquer vaga diretamente no chat do Telegram (ou com `/vaga <descrição>`). A IA (Groq) extrai automaticamente o Nome da Empresa e a Tecnologia Principal da vaga pelo texto. O bot calcula o match de aderência e gera o **Currículo em PDF** (nomeado inteligentemente com a empresa ou a tecnologia), **Dossiê em Markdown** e **Carta de Apresentação em Texto**, retornando todos anexados no chat.
+- **Auto-Apply por E-mail**: Se o e-mail de RH for identificado na varredura web ou na descrição enviada pelo Telegram, o robô dispara a candidatura **100% no automático**, anexando o PDF `CV_[Nome]_[Empresa_Ou_Tech].pdf` e enviando uma cópia de confirmação para o e-mail do próprio candidato.
 - **Gestão de Limpeza**: Deleta os PDFs e arquivos temporários do disco local após a notificação, mantendo a cópia e o histórico salvos 100% no Supabase.
 
 ---
@@ -162,16 +165,17 @@ CREATE TABLE IF NOT EXISTS public.prep_dossies (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- 6. Permissões de Leitura e Escrita
-ALTER TABLE public.vagas DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vagas_processadas DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.curriculos_gerados DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.prep_dossies DISABLE ROW LEVEL SECURITY;
+-- 6. Permissões de Leitura e Escrita e RLS (Row Level Security)
+ALTER TABLE public.vagas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vagas_processadas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.curriculos_gerados ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.prep_dossies ENABLE ROW LEVEL SECURITY;
 
-GRANT ALL ON public.vagas TO anon, authenticated, service_role;
-GRANT ALL ON public.vagas_processadas TO anon, authenticated, service_role;
-GRANT ALL ON public.curriculos_gerados TO anon, authenticated, service_role;
-GRANT ALL ON public.prep_dossies TO anon, authenticated, service_role;
+-- Removemos o acesso anon, permitindo apenas acessos autenticados ou service_role
+GRANT ALL ON public.vagas TO authenticated, service_role;
+GRANT ALL ON public.vagas_processadas TO authenticated, service_role;
+GRANT ALL ON public.curriculos_gerados TO authenticated, service_role;
+GRANT ALL ON public.prep_dossies TO authenticated, service_role;
 ```
 
 
@@ -310,7 +314,9 @@ Interaja com o robô em tempo real enviando os comandos:
 
 ## 🛡️ Conformidade & Auditoria GRC (Governance, Risk & Compliance)
 
-- **Veracidade Factual Absoluta**: Garantia de zero invenções de competências ou mentiras em currículos, mantendo integridade factual perante o mercado e órgãos reguladores.
+- **Segurança de Dados e Acesso (RLS)**: O Supabase foi reconfigurado para exigir chaves de serviço ou autenticadas (`authenticated`, `service_role`), revogando permissões públicas (`anon`) e ativando o **Row Level Security (RLS)** em todas as tabelas.
+- **Observabilidade Profissional**: Implementação robusta do módulo `logging` nativo do Python substituindo chamadas `print()`, garantindo rastreabilidade centralizada, formatação padronizada e captura de stack traces para facilitar debugging (ex: `logger.exception`).
+- **Veracidade Factual Absoluta e Foco em Resultados**: Garantia de zero invenções de competências. Toda saída gerada pela IA (Currículos, Cartas e Pitches) é **focada em resultados entregues e valor gerado**, mantendo integridade factual perante o mercado e órgãos reguladores.
 - **Sincronização de Fuso Horário**: Todos os relatórios utilizam o Horário de Brasília (BRT / UTC-3), garantindo que as contagens de vagas batam 100% entre a nuvem (GitHub Actions) e o seu Telegram.
 - **Proteção contra Injeção HTML**: Aplicação obrigatória de `html.escape` nas entradas web para prevenir erros de parse na API do Telegram.
 - **Sanitização de URLs de Banco**: O sistema higieniza URLs e chaves removendo aspas e adicionando `https://` automaticamente.

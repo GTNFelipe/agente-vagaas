@@ -76,12 +76,15 @@ CREATE INDEX IF NOT EXISTS idx_dossies_vaga_id ON public.prep_dossies(vaga_id);
 -- ==============================================================================
 
 -- Libera permissões de execução para os perfis autorizados da aplicação
-GRANT ALL ON public.vagas TO anon, authenticated, service_role;
-GRANT ALL ON public.vagas_processadas TO anon, authenticated, service_role;
-GRANT ALL ON public.curriculos_gerados TO anon, authenticated, service_role;
-GRANT ALL ON public.prep_dossies TO anon, authenticated, service_role;
+-- AVISO DE SEGURANÇA: O perfil 'anon' foi removido propositalmente para evitar acesso público irrestrito
+GRANT ALL ON public.vagas TO authenticated, service_role;
+GRANT ALL ON public.vagas_processadas TO authenticated, service_role;
+GRANT ALL ON public.curriculos_gerados TO authenticated, service_role;
+GRANT ALL ON public.prep_dossies TO authenticated, service_role;
 
--- (Opcional - Recomendado para produção pública) Habilitar RLS com Política Aberta para Bot:
--- ALTER TABLE public.vagas ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Permitir Acesso Total Bot" ON public.vagas FOR ALL USING (true);
+-- Habilitar RLS (Row Level Security) em todas as tabelas para garantir a conformidade (GRC)
+ALTER TABLE public.vagas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vagas_processadas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.curriculos_gerados ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.prep_dossies ENABLE ROW LEVEL SECURITY;
 

@@ -1,6 +1,9 @@
 import os
 import re
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 def gerar_dossie_vaga(vaga_info: dict, analise_ia: dict, output_dir: str = "dossies_vagas") -> str:
     """
@@ -70,5 +73,5 @@ def gerar_dossie_vaga(vaga_info: dict, analise_ia: dict, output_dir: str = "doss
     with open(caminho_arquivo, "w", encoding="utf-8") as f:
         f.write(conteudo_md)
 
-    print(f"[DOSSIÊ] Dossiê de entrevista gerado com sucesso: '{caminho_arquivo}'")
+    logger.info("[DOSSIÊ] Dossiê de entrevista gerado com sucesso: '%s'", caminho_arquivo)
     return caminho_arquivo

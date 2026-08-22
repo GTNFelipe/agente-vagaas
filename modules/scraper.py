@@ -2,9 +2,11 @@ import os
 import sys
 import re
 import json
+import logging
 from datetime import datetime
-import requests
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -66,7 +68,7 @@ def obter_orcamento_diario_serpapi() -> dict:
                         except Exception:
                             pass
         except Exception as e:
-            print(f"[AVISO SERPAPI BUDGET] Erro ao consultar cota da chave {api_key[:8]}...: {e}")
+            logger.warning("[SERPAPI BUDGET] Erro ao consultar cota da chave %s...: %s", api_key[:8], e)
     
     if chaves_validas > 0:
         limite_diario = max(1, total_restantes // dias_restantes) if total_restantes > 0 else 0
@@ -127,7 +129,7 @@ def registrar_busca_serpapi_executada():
         with open(SERPAPI_TRACKER_FILE, "w", encoding="utf-8") as f:
             json.dump(tracker, f, indent=2)
     except Exception as e:
-        print(f"[AVISO TRACKER SERPAPI] Falha ao registrar busca: {e}")
+        logger.warning("[TRACKER SERPAPI] Falha ao registrar busca: %s", e)
 
 def buscar_vagas_google_jobs(query: str, localizacao: str = "Brazil") -> list:
     """
@@ -138,11 +140,11 @@ def buscar_vagas_google_jobs(query: str, localizacao: str = "Brazil") -> list:
     vagas_encontradas = []
 
     if not chaves:
-        print("[AVISO] Nenhuma SERPAPI_KEY configurada. Pulando busca no Google Jobs.")
+        logger.warning("Nenhuma SERPAPI_KEY configurada. Pulando busca no Google Jobs.")
         return vagas_encontradas
 
     if GoogleSearch is None:
-        print("[AVISO] Biblioteca 'google-search-results' nao instalada. Pulando busca no Google Jobs.")
+        logger.warning("Biblioteca 'google-search-results' nao instalada. Pulando busca no Google Jobs.")
         return vagas_encontradas
 
     for idx, api_key in enumerate(chaves, start=1):
@@ -161,7 +163,7 @@ def buscar_vagas_google_jobs(query: str, localizacao: str = "Brazil") -> list:
 
             if "error" in results:
                 err_msg = str(results.get("error", ""))
-                print(f"[AVISO SERPAPI] Chave #{idx} ({api_key[:8]}...) retornou erro: '{err_msg}'. Alternando para a proxima chave...")
+                logger.warning("[SERPAPI] Chave #%s (%s...) retornou erro: '%s'. Alternando para a proxima chave...", idx, api_key[:8], err_msg)
                 continue
 
             jobs_results = results.get("jobs_results", [])
@@ -179,11 +181,11 @@ def buscar_vagas_google_jobs(query: str, localizacao: str = "Brazil") -> list:
                     "fonte": "Google Jobs"
                 })
 
-            print(f"[SERPAPI SUCESSO] Busca concluida com a Chave #{idx} ({api_key[:8]}...). Retornou {len(vagas_encontradas)} vagas.")
+            logger.info("[SERPAPI SUCESSO] Busca concluida com a Chave #%s (%s...). Retornou %s vagas.", idx, api_key[:8], len(vagas_encontradas))
             return vagas_encontradas
 
         except Exception as e:
-            print(f"[AVISO SERPAPI] Erro ao buscar com Chave #{idx} ({api_key[:8]}...): {e}. Alternando para a proxima chave...")
+            logger.warning("[SERPAPI] Erro ao buscar com Chave #%s (%s...): %s. Alternando para a proxima chave...", idx, api_key[:8], e)
 
     return vagas_encontradas
 
@@ -211,7 +213,7 @@ def buscar_vagas_rss_feed() -> list:
                         "fonte": "RSS Feed"
                     })
         except Exception as e:
-            print(f"[AVISO] Erro ao ler RSS Feed {url}: {e}")
+            logger.warning("Erro ao ler RSS Feed %s: %s", url, e)
 
     return vagas
 
@@ -249,7 +251,7 @@ def eh_candidatura_gratuita(vaga: dict) -> bool:
 
     # Bloqueio explícito do Bebee
     if "bebee.com" in link:
-        print(f"[FILTRO BEBEE] Vaga descartada por ser do portal Bebee: '{vaga.get('titulo')}'")
+        logger.info("[FILTRO BEBEE] Vaga descartada por ser do portal Bebee: '%s'", vaga.get('titulo'))
         return False
 
     padroes_paywall = [
@@ -272,7 +274,7 @@ def eh_candidatura_gratuita(vaga: dict) -> bool:
 
     for padrao in padroes_paywall:
         if re.search(padrao, texto_completo, re.IGNORECASE):
-            print(f"[FILTRO CANDIDATURA PAGA] Vaga descartada por requerer assinatura VIP/Pagamento: '{vaga.get('titulo')}'")
+            logger.info("[FILTRO CANDIDATURA PAGA] Vaga descartada por requerer assinatura VIP/Pagamento: '%s'", vaga.get('titulo'))
             return False
 
     return True
@@ -315,13 +317,13 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
     # 1. Descarte imediato de áreas/funções não desejadas no título (Ensino, Vendas, Cloud, DevOps, SRE, Dados, Suporte)
     for area_pat in CARGOS_EXCLUIDOS_COMPILED:
         if area_pat.search(titulo):
-            print(f"[FILTRO ÁREA EXCLUÍDA] Vaga descartada por ser de área/função não desejada ({area_pat.pattern}): '{vaga.get('titulo')}'")
+            logger.info("[FILTRO ÁREA EXCLUÍDA] Vaga descartada por ser de área/função não desejada (%s): '%s'", area_pat.pattern, vaga.get('titulo'))
             return False
 
     # 2. Descarte imediato de senioridade alta (Sênior, Lead, Gerente, Especialista, Architect)
     for sen_pat in SENIORIDADE_ALTA_COMPILED:
         if sen_pat.search(titulo):
-            print(f"[FILTRO SENIORIDADE ALTA] Vaga descartada por ser de nível Sênior/Lead ({sen_pat.pattern}): '{vaga.get('titulo')}'")
+            logger.info("[FILTRO SENIORIDADE ALTA] Vaga descartada por ser de nível Sênior/Lead (%s): '%s'", sen_pat.pattern, vaga.get('titulo'))
             return False
 
     # 3. Validação de Título: Deve se enquadrar como Desenvolvedor/Programador/Engenheiro ou Analista/Trainee/Low-code
@@ -334,7 +336,7 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
 
     tem_titulo_dev_analista = any(re.search(ptd, titulo, re.IGNORECASE) for ptd in padroes_titulo_dev_analista)
     if not tem_titulo_dev_analista:
-        print(f"[FILTRO TITULO DEVIANTE] Vaga descartada por fugir do perfil de Desenvolvedor / Analista de Sistemas: '{vaga.get('titulo')}'")
+        logger.info("[FILTRO TITULO DEVIANTE] Vaga descartada por fugir do perfil de Desenvolvedor / Analista de Sistemas: '%s'", vaga.get('titulo'))
         return False
 
     # 4. Descarte de Tecnologias/Stacks incompatíveis no título (C++, C#, .NET, PHP, Ruby, Go, Mobile, etc.)
@@ -351,20 +353,20 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
 
     for stack in stacks_incompativeis_titulo:
         if re.search(stack, titulo, re.IGNORECASE) and not (eh_automacao or eh_cobol_mainframe or eh_low_no_code):
-            print(f"[FILTRO STACK INCOMPATÍVEL] Vaga descartada por ser de tecnologia diferente do perfil ({stack}): '{vaga.get('titulo')}'")
+            logger.info("[FILTRO STACK INCOMPATÍVEL] Vaga descartada por ser de tecnologia diferente do perfil (%s): '%s'", stack, vaga.get('titulo'))
             return False
 
     # 5. Identifica se a vaga é de Automação / n8n, COBOL, Mainframe, Java, Python, Trainee, Low-code/No-code ou Analista de Sistemas
     eh_analista_sistemas = bool(re.search(r'\banalista\s+de\s+sistemas\b', texto_completo, re.IGNORECASE))
 
     if not (eh_automacao or eh_cobol_mainframe or eh_java or eh_analista_sistemas or eh_python or eh_trainee or eh_low_no_code):
-        print(f"[FILTRO CARGO] Vaga descartada por não ser das tecnologias alvo (COBOL, Mainframe, Java, Python, Trainee, n8n, Low-code/No-code ou Analista de Sistemas): '{vaga.get('titulo')}'")
+        logger.info("[FILTRO CARGO] Vaga descartada por não ser das tecnologias alvo: '%s'", vaga.get('titulo'))
         return False
 
     # 6. Checagem de Nível Pleno: Permitido para Automação / n8n / Low-code / No-code / COBOL / Mainframe
     eh_pleno = bool(re.search(r'\b(pleno|pl\.?|mid\s*-?\s*level)\b', titulo, re.IGNORECASE))
     if eh_pleno and not (eh_automacao or eh_low_no_code or eh_cobol_mainframe):
-        print(f"[FILTRO SENIORIDADE] Vaga de Pleno descartada (permitida apenas para Automação/n8n/Low-code/No-code/COBOL/Mainframe): '{vaga.get('titulo')}'")
+        logger.info("[FILTRO SENIORIDADE] Vaga de Pleno descartada: '%s'", vaga.get('titulo'))
         return False
 
     return True
@@ -409,13 +411,13 @@ def eh_vaga_no_brasil(vaga: dict) -> bool:
     ]
     for te in termos_exclusao_exterior:
         if re.search(te, texto_completo, re.IGNORECASE):
-            print(f"[FILTRO INTERNACIONAL] Vaga descartada por exigir relocalização no exterior: '{vaga.get('titulo')}'")
+            logger.info("[FILTRO INTERNACIONAL] Vaga descartada por exigir relocalização no exterior: '%s'", vaga.get('titulo'))
             return False
 
     # 3. Se mencionar país estrangeiro sem ter menção a Brasil / LATAM
     for pe in PAISES_ESTRANGEIROS_BLOQUEADOS:
         if re.search(pe, texto_completo, re.IGNORECASE):
-            print(f"[FILTRO INTERNACIONAL] Vaga descartada por localização no exterior ({pe}): '{vaga.get('titulo')}'")
+            logger.info("[FILTRO INTERNACIONAL] Vaga descartada por localização no exterior (%s): '%s'", pe, vaga.get('titulo'))
             return False
 
     return True
@@ -450,17 +452,17 @@ def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
 
     # 1. Se for vaga Híbrida ou Presencial em outra região (fora do RJ) -> REJEITA IMEDIATAMENTE
     if (eh_hibrido or eh_presencial) and tem_outra_regiao and not tem_marca_rj:
-        print(f"[FILTRO LOCALIDADE] Vaga Híbrida/Presencial descartada por ser fora do RJ: '{vaga.get('titulo')}' ({vaga.get('empresa')})")
+        logger.info("[FILTRO LOCALIDADE] Vaga Híbrida/Presencial descartada por ser fora do RJ: '%s' (%s)", vaga.get('titulo'), vaga.get('empresa'))
         return False
 
     # 2. Se for Presencial sem ser no RJ -> REJEITA
     if eh_presencial and not tem_marca_rj:
-        print(f"[FILTRO LOCALIDADE] Vaga Presencial descartada por não ser no RJ: '{vaga.get('titulo')}' ({vaga.get('empresa')})")
+        logger.info("[FILTRO LOCALIDADE] Vaga Presencial descartada por não ser no RJ: '%s' (%s)", vaga.get('titulo'), vaga.get('empresa'))
         return False
 
     # 3. Se for Híbrida sem ser no RJ -> REJEITA
     if eh_hibrido and not tem_marca_rj:
-        print(f"[FILTRO LOCALIDADE] Vaga Híbrida descartada por não ser no RJ: '{vaga.get('titulo')}' ({vaga.get('empresa')})")
+        logger.info("[FILTRO LOCALIDADE] Vaga Híbrida descartada por não ser no RJ: '%s' (%s)", vaga.get('titulo'), vaga.get('empresa'))
         return False
 
     # 4. Se for Remota 100% -> APROVA
@@ -472,7 +474,7 @@ def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
         return True
 
     # Se não for 100% remota nem no RJ -> REJEITA por segurança
-    print(f"[FILTRO LOCALIDADE] Vaga descartada por não ser 100% Remota nem no RJ: '{vaga.get('titulo')}' ({vaga.get('empresa')})")
+    logger.info("[FILTRO LOCALIDADE] Vaga descartada por não ser 100%% Remota nem no RJ: '%s' (%s)", vaga.get('titulo'), vaga.get('empresa'))
     return False
 
 TERMOS_EXCLUSIVOS_GRUPO_REGEX = [
@@ -519,12 +521,12 @@ def eh_vaga_publico_geral(vaga: dict) -> bool:
 
     # Bloqueio imediato se a marcação PCD ou Mulheres estiver presente no título da vaga
     if re.search(r'\bpcd\b', titulo, re.IGNORECASE):
-        print(f"[FILTRO PCD] Vaga descartada por ser direcionada a PCD (marcação no título): '{vaga.get('titulo')}'")
+        logger.info("[FILTRO PCD] Vaga descartada por ser direcionada a PCD (marcação no título): '%s'", vaga.get('titulo'))
         return False
 
     for p_excl in TERMOS_EXCLUSIVOS_GRUPO_REGEX:
         if re.search(p_excl, texto_completo, re.IGNORECASE):
-            print(f"[FILTRO AFIRMATIVO EXCLUSIVO] Vaga descartada por ser exclusiva/afirmativa para público específico: '{vaga.get('titulo')}'")
+            logger.info("[FILTRO AFIRMATIVO EXCLUSIVO] Vaga descartada por ser exclusiva/afirmativa para público específico: '%s'", vaga.get('titulo'))
             return False
 
     return True
@@ -561,7 +563,7 @@ def buscar_vagas_programathor() -> list:
                         "fonte": "Programathor"
                     })
     except Exception as e:
-        print(f"[AVISO PROGRAMATHOR] Erro ao buscar vagas no Programathor: {e}")
+        logger.warning("[PROGRAMATHOR] Erro ao buscar vagas no Programathor: %s", e)
 
     return vagas
 
@@ -608,7 +610,7 @@ def buscar_vagas_github_repos() -> list:
                         "fonte": f"GitHub Fórum ({repo})"
                     })
         except Exception as e:
-            print(f"[AVISO GITHUB REPOS] Erro ao buscar vagas no repositório '{repo}': {e}")
+            logger.warning("[GITHUB REPOS] Erro ao buscar vagas no repositório '%s': %s", repo, e)
 
     return vagas_github
 
@@ -670,7 +672,7 @@ def buscar_vagas_linkedin_publico(keywords: str, location: str = "Brasil") -> li
                     "fonte": "LinkedIn Public"
                 })
     except Exception as e:
-        print(f"[AVISO] Falha ao coletar vagas públicas do LinkedIn para '{keywords}': {e}")
+        logger.warning("Falha ao coletar vagas públicas do LinkedIn para '%s': %s", keywords, e)
 
     return vagas
 
@@ -698,16 +700,16 @@ def executar_varredura_completa(cargos_alvo: list = None):
     if permitido_serp:
         day_of_year = datetime.now().timetuple().tm_yday
         query_do_dia = queries_google[day_of_year % len(queries_google)]
-        print(f"[BUSCA GOOGLE JOBS] Disparando pesquisa no Google Jobs via SerpAPI (Uso Hoje: {buscas_hoje+1}/{limite_diario_serp})...")
-        print(f"[SERPAPI ROTATIVO] Termo selecionado para hoje: '{query_do_dia}'")
+        logger.info("[BUSCA GOOGLE JOBS] Disparando pesquisa no Google Jobs via SerpAPI (Uso Hoje: %s/%s)...", buscas_hoje+1, limite_diario_serp)
+        logger.info("[SERPAPI ROTATIVO] Termo selecionado para hoje: '%s'", query_do_dia)
         vagas_g = buscar_vagas_google_jobs(query=query_do_dia)
         registrar_busca_serpapi_executada()
-        print(f"[GOOGLE JOBS] Query '{query_do_dia}' retornou {len(vagas_g)} vagas.")
+        logger.info("[GOOGLE JOBS] Query '%s' retornou %s vagas.", query_do_dia, len(vagas_g))
         todas_vagas.extend(vagas_g)
     else:
-        print(f"[BUSCA GOOGLE JOBS] Cota diária do SerpAPI atingida ({buscas_hoje}/{limite_diario_serp} disparos hoje). Pulando Google Jobs nesta rodada para preservar cota até a renovação.")
+        logger.info("[BUSCA GOOGLE JOBS] Cota diária do SerpAPI atingida (%s/%s disparos hoje). Pulando Google Jobs...", buscas_hoje, limite_diario_serp)
 
-    print("[BUSCA LINKEDIN] Varrendo LinkedIn (Portal Público / Sem consumo de cota)...")
+    logger.info("[BUSCA LINKEDIN] Varrendo LinkedIn (Portal Público / Sem consumo de cota)...")
     vagas_linkedin = []
     queries_linkedin = [
         "Desenvolvedor Java Junior",
@@ -722,15 +724,15 @@ def executar_varredura_completa(cargos_alvo: list = None):
     for q in queries_linkedin:
         vl = buscar_vagas_linkedin_publico(keywords=q, location="Brasil")
         vagas_linkedin.extend(vl)
-    print(f"[LINKEDIN] Coletadas {len(vagas_linkedin)} vagas do LinkedIn.")
+    logger.info("[LINKEDIN] Coletadas %s vagas do LinkedIn.", len(vagas_linkedin))
 
-    print("[BUSCA PROGRAMATHOR] Varrendo portal Programathor (Gratuito / Sem consumo de cota)...")
+    logger.info("[BUSCA PROGRAMATHOR] Varrendo portal Programathor (Gratuito / Sem consumo de cota)...")
     vagas_programathor = buscar_vagas_programathor()
 
-    print("[BUSCA FORUNS TECH] Varrendo fóruns de comunidade no GitHub (backend-br e soujava)...")
+    logger.info("[BUSCA FORUNS TECH] Varrendo fóruns de comunidade no GitHub (backend-br e soujava)...")
     vagas_github_forums = buscar_vagas_github_repos()
 
-    print("[BUSCA FEEDS] Varrendo RSS Feeds de vagas (Gratuito / Sem consumo de cota)...")
+    logger.info("[BUSCA FEEDS] Varrendo RSS Feeds de vagas (Gratuito / Sem consumo de cota)...")
     vagas_rss = buscar_vagas_rss_feed()
 
     todas_coletadas = todas_vagas + vagas_linkedin + vagas_programathor + vagas_github_forums + vagas_rss
@@ -745,11 +747,11 @@ def executar_varredura_completa(cargos_alvo: list = None):
                         if eh_vaga_remota_ou_rj(vaga):
                             vagas_filtradas.append(vaga)
                         else:
-                            print(f"[FILTRO LOCALIDADE] Vaga descartada (Presencial/Híbrida fora do RJ): '{vaga.get('titulo')}'")
+                            logger.info("[FILTRO LOCALIDADE] Vaga descartada (Presencial/Híbrida fora do RJ): '%s'", vaga.get('titulo'))
                     else:
-                        print(f"[FILTRO PAÍS] Vaga descartada por ser localizada fora do Brasil: '{vaga.get('titulo')}'")
+                        logger.info("[FILTRO PAÍS] Vaga descartada por ser localizada fora do Brasil: '%s'", vaga.get('titulo'))
 
-    print(f"[SUCESSO] Total de vagas filtradas (Brasil, Gratuitas, Remoto/RJ): {len(vagas_filtradas)}")
+    logger.info("[SUCESSO] Total de vagas filtradas (Brasil, Gratuitas, Remoto/RJ): %s", len(vagas_filtradas))
     return vagas_filtradas
 
 coletar_vagas_todas_fontes = executar_varredura_completa
@@ -772,13 +774,13 @@ def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
         response = HTTP_SESSION.get(url, headers=headers, timeout=timeout, allow_redirects=True)
 
         if response.status_code >= 400:
-            print(f"[VALIDAÇÃO] Link inativo ou indisponível (HTTP {response.status_code}): {url}")
+            logger.info("[VALIDAÇÃO] Link inativo ou indisponível (HTTP %s): %s", response.status_code, url)
             return False
 
         final_url = response.url.lower().rstrip("/")
         path_parts = [p for p in final_url.replace("https://", "").replace("http://", "").split("/") if p]
         if len(path_parts) <= 1:
-            print(f"[VALIDAÇÃO] Link redirecionou para a página inicial (vaga removida): {url} -> {response.url}")
+            logger.info("[VALIDAÇÃO] Link redirecionou para a página inicial (vaga removida): %s -> %s", url, response.url)
             return False
 
         soup = BeautifulSoup(response.content, "html.parser")
@@ -810,7 +812,7 @@ def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
 
         for expr in expressoes_encerramento:
             if expr in texto_pagina:
-                print(f"[VALIDAÇÃO] Vaga encerrada detectada ('{expr}'): {url}")
+                logger.info("[VALIDAÇÃO] Vaga encerrada detectada ('%s'): %s", expr, url)
                 return False
 
         # 2. Validação de Paywall / VIP na página ao vivo
@@ -827,13 +829,13 @@ def vaga_ainda_ativa(url: str, timeout: int = 8) -> bool:
 
         for pw in expressoes_paywall:
             if pw in texto_pagina:
-                print(f"[VALIDAÇÃO PAYWALL] Vaga descartada por exigir plano VIP/Pagamento ('{pw}'): {url}")
+                logger.info("[VALIDAÇÃO PAYWALL] Vaga descartada por exigir plano VIP/Pagamento ('%s'): %s", pw, url)
                 return False
 
         return True
 
     except Exception as e:
-        print(f"[AVISO] Nao foi possivel checar status HTTP do link ({url}): {e}")
+        logger.warning("Nao foi possivel checar status HTTP do link (%s): %s", url, e)
         return True
 
 EMAILS_IGNORADOS = [
@@ -871,10 +873,10 @@ def extrair_email_profundo(url: str, timeout: int = 8) -> str:
             email_lower = email.lower()
             # Ignora e-mails genéricos de sistema/suporte/plataforma
             if not any(ign in email_lower for ign in EMAILS_IGNORADOS):
-                print(f"[DEEP SCRAPING] E-mail de recrutador/RH encontrado na página original: {email} (Link: {url})")
+                logger.info("[DEEP SCRAPING] E-mail de recrutador/RH encontrado na página original: %s (Link: %s)", email, url)
                 return email
 
     except Exception as e:
-        print(f"[AVISO DEEP SCRAPING] Erro ao buscar e-mail em {url}: {e}")
+        logger.warning("[DEEP SCRAPING] Erro ao buscar e-mail em %s: %s", url, e)
 
     return None

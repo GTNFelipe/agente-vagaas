@@ -7,7 +7,10 @@ import re
 import ctypes
 import html
 import requests
+import logging
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Configura encoding de saída para evitar crash com emojis no console do Windows (cp1252)
 if hasattr(sys.stdout, "reconfigure"):
@@ -23,9 +26,9 @@ def prevenir_sono_sistema():
             ES_CONTINUOUS = 0x80000000
             ES_SYSTEM_REQUIRED = 0x00000001
             ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)
-            print("[POWER MANAGEMENT] Trava de inatividade ativada: Windows impedido de suspender o bot.")
+            logger.info("[POWER MANAGEMENT] Trava de inatividade ativada: Windows impedido de suspender o bot.")
         except Exception as e:
-            print(f"[POWER MANAGEMENT] Aviso ao configurar trava de inatividade: {e}")
+            logger.warning("[POWER MANAGEMENT] Aviso ao configurar trava de inatividade: %s", e)
 
 ULTIMO_PING_ONLINE = time.time()
 
@@ -57,7 +60,7 @@ def garantir_instancia_unica(port: int = 47891):
         sock.bind(("127.0.0.1", port))
         return sock
     except socket.error:
-        print(f"[BOT LOCK] Outra instância do bot já está rodando (Porta {port}). Encerrando duplicata.")
+        logger.warning("[BOT LOCK] Outra instância do bot já está rodando (Porta %s). Encerrando duplicata.", port)
         sys.exit(0)
 
 # Adiciona o diretório raiz ao PYTHONPATH para permitir importações dos módulos
@@ -102,7 +105,7 @@ def enviar_mensagem_telegram(chat_id: str, texto: str):
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        print(f"[ERRO TELEGRAM] Falha ao enviar mensagem: {e}")
+        logger.error("[ERRO TELEGRAM] Falha ao enviar mensagem: %s", e)
 
 def consultar_uso_serpapi() -> dict:
     """Consulta os dados reais de uso da API SerpAPI diretamente na API oficial (consolida todas as chaves configuradas)."""
@@ -130,7 +133,7 @@ def consultar_uso_serpapi() -> dict:
                     renovacao = data.get("plan_renewal_date", "N/A")
                 chaves_validas += 1
         except Exception as e:
-            print(f"[ERRO SERPAPI ACCOUNT] {e}")
+            logger.error("[ERRO SERPAPI ACCOUNT] %s", e)
 
     if chaves_validas > 0:
         return {
@@ -238,7 +241,7 @@ def gerar_relatorio_diario_telegram(automatico: bool = False) -> str:
             res_vagas = supabase.table("vagas").select("id, created_at").gte("created_at", inicio_utc_str).execute()
             qualificadas_hoje = len(res_vagas.data or [])
         except Exception as e:
-            print(f"[AVISO RELATORIO] Erro ao consultar Supabase, usando fallback local: {e}")
+            logger.warning("[AVISO RELATORIO] Erro ao consultar Supabase, usando fallback local: %s", e)
             supabase = None
 
     if not supabase:
@@ -312,6 +315,17 @@ def processar_vaga_direta(chat_id: str, texto_vaga: str):
             if len(primeira_linha) <= 60 and not primeira_linha.lower().startswith("descriç"):
                 titulo = primeira_linha
 
+        analise = adaptar_curriculo(texto_vaga, perfil_base)
+        match_score = analise.get("match_score", 0)
+
+        empresa_identificada = analise.get("empresa_identificada", "").strip()
+        if empresa == "Empresa via Telegram" and empresa_identificada and empresa_identificada.lower() not in ["", "vazia", "não informada", "nao informada"]:
+            empresa = empresa_identificada
+
+        tecnologia_principal = analise.get("tecnologia_principal", "").strip()
+        if not tecnologia_principal or tecnologia_principal.lower() in ["", "vazia", "não informada", "nao informada"]:
+            tecnologia_principal = "Tech"
+
         vaga_info = {
             "titulo": titulo,
             "empresa": empresa,
@@ -319,16 +333,18 @@ def processar_vaga_direta(chat_id: str, texto_vaga: str):
             "descricao": texto_vaga
         }
 
-        analise = adaptar_curriculo(texto_vaga, perfil_base)
-        match_score = analise.get("match_score", 0)
+        nome_candidato_clean = (re.sub(r'[^\w\-_]', '_', str(perfil_base.get("nome", "Candidato"))).strip("_")[:30]).upper() or "CANDIDATO"
 
-        clean_empresa = (re.sub(r'[^\w\-_]', '_', str(empresa)).strip("_")[:30]) or "Empresa"
-        nome_candidato_clean = (re.sub(r'[^\w\-_]', '_', str(perfil_base.get("nome", "Candidato"))).strip("_")[:30]) or "Candidato"
+        if empresa == "Empresa via Telegram":
+            sufixo_arquivo = (re.sub(r'[^\w\-_]', '_', str(tecnologia_principal)).strip("_")[:30]).upper()
+        else:
+            sufixo_arquivo = (re.sub(r'[^\w\-_]', '_', str(empresa)).strip("_")[:30]).upper()
+
+        nome_arquivo_pdf = f"CV_{nome_candidato_clean}_{sufixo_arquivo}.pdf"
 
         # 1. Gerar PDF do Currículo Otimizado
         pasta_cvs = "curriculos_gerados"
         os.makedirs(pasta_cvs, exist_ok=True)
-        nome_arquivo_pdf = f"CV_{nome_candidato_clean}_{clean_empresa}.pdf"
         caminho_pdf = os.path.join(pasta_cvs, nome_arquivo_pdf)
         gerar_pdf_curriculo(perfil_base, analise, output_filename=caminho_pdf)
 
@@ -453,7 +469,7 @@ def comando_historico_vagas(chat_id: str):
                             data_form = {"chat_id": chat_id, "caption": legenda_html, "parse_mode": "HTML"}
                             requests.post(doc_url, data=data_form, files=files, timeout=15)
                     except Exception as e:
-                        print(f"[ERRO TELEGRAM HISTORICO] Falha ao enviar PDF: {e}")
+                        logger.error("[ERRO TELEGRAM HISTORICO] Falha ao enviar PDF: %s", e)
                     
                     try:
                         os.remove(caminho_pdf)
@@ -475,12 +491,12 @@ def processar_mensagem(update: dict):
     if not text:
         return
 
-    print(f"[BOT TELEGRAM] Mensagem recebida de {chat_id}: '{text[:30]}...'")
+    logger.info("[BOT TELEGRAM] Mensagem recebida de %s: '%s...'", chat_id, text[:30])
 
     # Valida se a mensagem veio do seu chat autorizado (se TELEGRAM_CHAT_ID estiver configurado)
     authorized_chat_id = str(os.getenv("TELEGRAM_CHAT_ID") or TELEGRAM_CHAT_ID or "").strip()
     if authorized_chat_id and chat_id != authorized_chat_id:
-        print(f"[BOT SECURITY] Mensagem ignorada de chat não autorizado: {chat_id} (esperado: {authorized_chat_id})")
+        logger.warning("[BOT SECURITY] Mensagem ignorada de chat não autorizado: %s (esperado: %s)", chat_id, authorized_chat_id)
         return
 
     if text.startswith("/"):
@@ -541,12 +557,12 @@ def escutar_comandos():
     _lock_socket = garantir_instancia_unica()
 
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        print("[BOT TELEGRAM] TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não definidos.")
+        logger.error("[BOT TELEGRAM] TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não definidos.")
         return
 
     iniciar_heartbeat_monitor()
 
-    print("🤖 [BOT TELEGRAM INTERATIVO 24/7] Escutando comandos continuamente... (Pressione Ctrl+C para parar)")
+    logger.info("🤖 [BOT TELEGRAM INTERATIVO 24/7] Escutando comandos continuamente... (Pressione Ctrl+C para parar)")
     offset = 0
 
     session = requests.Session()
@@ -564,22 +580,22 @@ def escutar_comandos():
                     offset = update["update_id"] + 1
                     processar_mensagem(update)
             elif resp.status_code == 409:
-                print("[BOT TELEGRAM] Conflito (409) detectado. Reaguardando 5s...")
+                logger.warning("[BOT TELEGRAM] Conflito (409) detectado. Reaguardando 5s...")
                 time.sleep(5)
             else:
-                print(f"[BOT TELEGRAM] Código HTTP {resp.status_code}. Aguardando 3s...")
+                logger.warning("[BOT TELEGRAM] Código HTTP %s. Aguardando 3s...", resp.status_code)
                 time.sleep(3)
         except requests.exceptions.Timeout:
             # Timeout normal do long polling (15s sem mensagens). Continua o loop imediatamente mantendo a conexão aquecida!
             ULTIMO_PING_ONLINE = time.time()
             continue
         except requests.exceptions.RequestException as req_err:
-            print(f"[ERRO REDE TELEGRAM] Oscilação de conexão: {req_err}. Reconectando sessão HTTP em 3s...")
+            logger.warning("[ERRO REDE TELEGRAM] Oscilação de conexão: %s. Reconectando sessão HTTP em 3s...", req_err)
             session = requests.Session()
             session.headers.update({"Connection": "keep-alive"})
             time.sleep(3)
         except Exception as e:
-            print(f"[ERRO BOT TELEGRAM] {e}")
+            logger.error("[ERRO BOT TELEGRAM] %s", e)
             time.sleep(5)
 
 

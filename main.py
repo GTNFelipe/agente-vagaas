@@ -3,7 +3,14 @@ import os
 import sys
 import re
 import time
+import logging
 from dotenv import load_dotenv
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -42,7 +49,7 @@ def extrair_email_texto(texto: str) -> str:
     return emails[0] if emails else None
 
 def main(manual: bool = False, target_chat_id: str = None):
-    print("[INICIO] Executando Agente de Vagas & Candidatura Autonoma (Fase 3)...")
+    logger.info("[INICIO] Executando Agente de Vagas & Candidatura Autonoma (Fase 3)...")
     
     perfil_base = carregar_perfil_base()
     cargos_alvo = perfil_base.get("cargos_alvo", ["Desenvolvedor COBOL", "Desenvolvedor Java Junior"])
@@ -52,7 +59,7 @@ def main(manual: bool = False, target_chat_id: str = None):
     vagas_encontradas = coletar_vagas_todas_fontes(cargos_alvo)
 
     if not vagas_encontradas:
-        print("[INFO] Nenhuma vaga encontrada nesta rodada.")
+        logger.info("Nenhuma vaga encontrada nesta rodada.")
         notificar_resumo_varredura(vagas_coletadas=0, vagas_novas_processadas=0, manual=manual, chat_id=target_chat_id)
         return
 
@@ -69,20 +76,20 @@ def main(manual: bool = False, target_chat_id: str = None):
 
         if vaga_ja_processada(supabase_client, vaga):
             vagas_duplicadas += 1
-            print(f"[SKIP] Vaga ja registrada/candidatada: '{titulo}' ({vaga.get('empresa')}). Pulando...")
+            logger.info("[SKIP] Vaga ja registrada/candidatada: '%s' (%s). Pulando...", titulo, vaga.get('empresa'))
             continue
 
         # Validação de status em tempo real na web
         if link and not vaga_ainda_ativa(link):
             vagas_encerradas += 1
-            print(f"[SKIP] Vaga ENCERRADA ou Inativa na web: '{titulo}' ({vaga.get('empresa')}). Pulando...")
+            logger.info("[SKIP] Vaga ENCERRADA ou Inativa na web: '%s' (%s). Pulando...", titulo, vaga.get('empresa'))
             salvar_vaga_processada(supabase_client, vaga, {"match_score": 0, "justificativa_match": "Vaga encerrada ou inativa na web"}, status_candidatura="encerrada")
             continue
 
-        print(f"\n[VAGA] Analisando: {titulo} - {vaga.get('empresa')}")
+        logger.info("\n[VAGA] Analisando: %s - %s", titulo, vaga.get('empresa'))
         analise = adaptar_curriculo(vaga.get("descricao", titulo), perfil_base)
         match_score = analise.get("match_score", 0)
-        print(f"[SCORE] Score de Match: {match_score}%")
+        logger.info("[SCORE] Score de Match: %s%%", match_score)
 
         if match_score >= 80:
             clean_empresa = (re.sub(r'[^\w\-_]', '_', str(vaga.get("empresa", "Empresa"))).strip("_")[:30]) or "Empresa"
@@ -114,7 +121,7 @@ def main(manual: bool = False, target_chat_id: str = None):
             
             # Se não encontrou e-mail no resumo -> Executa o SCRAPING PROFUNDO na página web oficial da vaga!
             if not email_recrutador and vaga.get("link"):
-                print(f"[DEEP SCRAPING] Investigando e-mail de RH na página original: {vaga.get('link')}...")
+                logger.info("[DEEP SCRAPING] Investigando e-mail de RH na página original: %s...", vaga.get('link'))
                 email_recrutador = extrair_email_profundo(vaga.get("link"))
 
             status_envio = "alerta_manual"
@@ -122,7 +129,7 @@ def main(manual: bool = False, target_chat_id: str = None):
             # Se encontrou e-mail de recrutador -> APLICA AUTOMÁTICO!
             if email_recrutador:
                 vaga["email_candidatura"] = email_recrutador
-                print(f"[AUTO-APPLY] E-mail de recrutador identificado ({email_recrutador}). Executando Auto-Apply...")
+                logger.info("[AUTO-APPLY] E-mail de recrutador identificado (%s). Executando Auto-Apply...", email_recrutador)
                 sucesso_apply = realizar_candidatura_auto_email(vaga, analise, caminho_pdf)
                 if sucesso_apply:
                     status_envio = "candidatado_auto"
@@ -148,10 +155,10 @@ def main(manual: bool = False, target_chat_id: str = None):
                     try:
                         os.remove(temp_file)
                     except Exception as e:
-                        print(f"[AVISO] Erro ao remover arquivo temporario ({temp_file}): {e}")
+                        logger.warning("Erro ao remover arquivo temporario (%s): %s", temp_file, e)
         else:
             vagas_descartadas_score += 1
-            print(f"[INFO] Vaga descartada (Score {match_score}% < 80%).")
+            logger.info("Vaga descartada (Score %s%% < 80%%).", match_score)
             salvar_vaga_processada(supabase_client, vaga, analise, status_candidatura="descartado")
 
         time.sleep(3)
@@ -167,7 +174,7 @@ def main(manual: bool = False, target_chat_id: str = None):
         manual=manual,
         chat_id=target_chat_id
     )
-    print("\n[SUCESSO] Execucao completa finalizada com sucesso!")
+    logger.info("\n[SUCESSO] Execucao completa finalizada com sucesso!")
 
 if __name__ == "__main__":
     main()

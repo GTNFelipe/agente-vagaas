@@ -60,10 +60,15 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
     5. Escreva uma CARTA DE APRESENTAÇÃO profissional (cover_letter) curta, direta, focada em resultados e 100% verdadeira (máximo 3 parágrafos) em 1ª pessoa, pronta para ser enviada ao recrutador.
     6. Crie um DOSSIÊ DE PREPARAÇÃO PARA ENTREVISTA (dossie_entrevista) factual. O pitch de elevador no dossiê deve ser orientado a entregas de valor.
 
+    7. Identifique o Nome da Empresa contratante no texto (empresa_identificada). Se não houver nome, retorne vazio "".
+    8. Identifique a tecnologia ou competência principal da vaga (tecnologia_principal), ex: "Python", "Java", "COBOL", "Analista".
+
     RETORNE ESTRITAMENTE UM JSON NO SEGUINTE FORMATO (Sem markdown em volta ou texto extra):
     {{
         "match_score": 85,
         "justificativa_match": "Explicação em uma frase",
+        "empresa_identificada": "Nome da Empresa ou vazio",
+        "tecnologia_principal": "Tecnologia Principal",
         "resumo_adaptado": "Resumo profissional 100% verdadeiro customizado a favor da vaga com base no perfil factual",
         "habilidades_destacadas": ["Skill Real 1", "Skill Real 2", "Skill Real 3"],
         "cover_letter": "Texto completo da carta de apresentação para o recrutador",
@@ -174,6 +179,8 @@ def _fallback_adaptacao(perfil_json: dict, descricao_vaga: str) -> dict:
     return {
         "match_score": 85,
         "justificativa_match": "Forte correspondência técnica em Python, Docker, APIs REST, Postgres e automação com n8n.",
+        "empresa_identificada": "",
+        "tecnologia_principal": "Python",
         "resumo_adaptado": perfil_json.get("resumo_profissional", ""),
         "habilidades_destacadas": [
             "Python / APIs REST",

@@ -1,6 +1,9 @@
 import os
 import re
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 def gerar_arquivo_carta_apresentacao(vaga_info: dict, analise_ia: dict, perfil_base: dict, output_dir: str = "cartas_apresentacao") -> str:
     """
@@ -48,5 +51,5 @@ Atenciosamente,
     with open(caminho_arquivo, "w", encoding="utf-8") as f:
         f.write(conteudo_completo)
 
-    print(f"[CARTA] Carta de Apresentação salva em: '{caminho_arquivo}'")
+    logger.info("[CARTA] Carta de Apresentação salva em: '%s'", caminho_arquivo)
     return caminho_arquivo

@@ -3,9 +3,12 @@ import re
 import html
 import smtplib
 import requests
+import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+
+logger = logging.getLogger(__name__)
 
 def realizar_candidatura_auto_email(vaga_info: dict, analise_ia: dict, caminho_pdf: str, perfil_base: dict = None) -> bool:
     """
@@ -88,23 +91,22 @@ def realizar_candidatura_auto_email(vaga_info: dict, analise_ia: dict, caminho_p
             server.login(remetente, senha_app)
             destinatarios = [email_recrutador, remetente]
             server.send_message(msg, to_addrs=destinatarios)
-        print(f"[SUCESSO] CANDIDATURA AUTOMATICA ENVIADA para {email_recrutador} com sucesso!")
+            server.quit()
+        logger.info("[SUCESSO] CANDIDATURA AUTOMATICA ENVIADA para %s com sucesso!", email_recrutador)
         return True
     except Exception as e:
-        print(f"[ERRO] Erro ao enviar candidatura por e-mail: {e}")
+        logger.error("Erro ao enviar candidatura por e-mail: %s", e)
         return False
 
 def enviar_notificacao_telegram(vaga_info: dict, analise_ia: dict, caminho_pdf: str = None, caminho_dossie: str = None, caminho_carta: str = None, modo_candidatura: str = "manual") -> bool:
     """
     Dispara notificações ricas e exclusivas com botões inline diretamente para o Telegram do usuário.
     """
-    import requests
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
 
-
     if not token or not chat_id:
-        print("⚠️ Credentials do Telegram não configuradas (TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID). Pulando notificação no Telegram.")
+        logger.warning("Credentials do Telegram não configuradas (TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID). Pulando notificação no Telegram.")
         return False
 
     match_score = analise_ia.get("match_score", 0)
@@ -158,28 +160,29 @@ def enviar_notificacao_telegram(vaga_info: dict, analise_ia: dict, caminho_pdf: 
     try:
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
-            print("[TELEGRAM] Notificacao enviada para o Telegram com sucesso!")
+            logger.info("[TELEGRAM] Notificacao enviada para o Telegram com sucesso!")
         else:
             resp_data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
             desc = resp_data.get("description", response.text)
             if "chat not found" in desc.lower():
-                print(f"[ERRO TELEGRAM] Chat nao encontrado para o ID '{chat_id}'. ATENCAO: Voce precisa abrir a conversa com o seu Bot no Telegram e clicar em 'COMEÇAR' (/start) para autorizar o bot a enviar mensagens!")
+                logger.error("[ERRO TELEGRAM] Chat nao encontrado para o ID '%s'. ATENCAO: Voce precisa abrir a conversa com o seu Bot no Telegram e clicar em 'COMEÇAR' (/start) para autorizar o bot a enviar mensagens!", chat_id)
             else:
-                print(f"[ERRO TELEGRAM] Falha ao enviar mensagem: {desc}")
+                logger.error("[ERRO TELEGRAM] Falha ao enviar mensagem: %s", desc)
+            return False
     except Exception as e:
-        print(f"[ERRO TELEGRAM] Falha de conexao com a API do Telegram: {e}")
+        logger.error("[ERRO TELEGRAM] Falha de conexao com a API do Telegram: %s", e)
+        return False
 
-    # Envia os documentos (PDF, Dossiê MD, Carta TXT) para o Telegram
-    for fpath in [caminho_pdf, caminho_dossie, caminho_carta]:
-        if fpath and os.path.exists(fpath):
-            try:
-                with open(fpath, "rb") as doc_file:
-                    files = {"document": (os.path.basename(fpath), doc_file)}
-                    data = {"chat_id": chat_id}
-                    requests.post(doc_url, data=data, files=files, timeout=15)
-                print(f"[TELEGRAM] Anexo '{os.path.basename(fpath)}' enviado para o Telegram!")
-            except Exception as e:
-                print(f"[ERRO TELEGRAM] Erro ao enviar anexo '{fpath}' para o Telegram: {e}")
+    anexos = [f for f in [caminho_pdf, caminho_dossie, caminho_carta] if f and os.path.exists(f)]
+    for fpath in anexos:
+        try:
+            with open(fpath, "rb") as doc_file:
+                files = {"document": (os.path.basename(fpath), doc_file)}
+                data = {"chat_id": chat_id}
+                requests.post(doc_url, data=data, files=files, timeout=15)
+            logger.info("[TELEGRAM] Anexo '%s' enviado para o Telegram!", os.path.basename(fpath))
+        except Exception as e:
+            logger.error("[ERRO TELEGRAM] Erro ao enviar anexo '%s' para o Telegram: %s", fpath, e)
 
     return True
 
@@ -243,12 +246,13 @@ def notificar_resumo_varredura(
     try:
         resp = requests.post(url, json=payload, timeout=10)
         if resp.status_code == 200:
-            print(f"[TELEGRAM] Resumo detalhado da varredura enviado para {target_chat}! ({vagas_novas_processadas} qualificadas / {vagas_coletadas} coletadas)")
+            logger.info("[TELEGRAM] Resumo detalhado da varredura enviado para %s! (%s qualificadas / %s coletadas)", target_chat, vagas_novas_processadas, vagas_coletadas)
+        else:
+            logger.error("[ERRO TELEGRAM] Falha ao enviar resumo da varredura: %s", resp.text)
     except Exception as e:
-        print(f"[ERRO TELEGRAM] Falha ao enviar resumo da varredura: {e}")
+        logger.error("[ERRO TELEGRAM] Exceção ao enviar resumo: %s", e)
 
     return True
-
 
 # Aliases para compatibilidade
 enviar_notificacao_vaga = enviar_notificacao_telegram
