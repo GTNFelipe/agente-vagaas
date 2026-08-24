@@ -62,12 +62,16 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
 
     7. Identifique o Nome da Empresa contratante no texto (empresa_identificada). Se não houver nome, retorne vazio "".
     8. Identifique a tecnologia ou competência principal da vaga (tecnologia_principal), ex: "Python", "Java", "COBOL", "Analista".
+    9. Identifique o Nome do Recrutador ou da pessoa que postou a vaga (nome_recrutador). Se não identificar, retorne vazio "".
+    10. Identifique o gênero do recrutador com base no nome (genero_recrutador). Retorne "M" para masculino, "F" para feminino, ou "N/A" se não for possível identificar ou não houver nome.
 
     RETORNE ESTRITAMENTE UM JSON NO SEGUINTE FORMATO (Sem markdown em volta ou texto extra):
     {{
         "match_score": 85,
         "justificativa_match": "Explicação em uma frase",
         "empresa_identificada": "Nome da Empresa ou vazio",
+        "nome_recrutador": "Nome do recrutador ou vazio",
+        "genero_recrutador": "M, F, ou N/A",
         "tecnologia_principal": "Tecnologia Principal",
         "resumo_adaptado": "Resumo profissional 100% verdadeiro customizado a favor da vaga com base no perfil factual",
         "habilidades_destacadas": ["Skill Real 1", "Skill Real 2", "Skill Real 3"],
@@ -180,6 +184,8 @@ def _fallback_adaptacao(perfil_json: dict, descricao_vaga: str) -> dict:
         "match_score": 85,
         "justificativa_match": "Forte correspondência técnica em Python, Docker, APIs REST, Postgres e automação com n8n.",
         "empresa_identificada": "",
+        "nome_recrutador": "",
+        "genero_recrutador": "N/A",
         "tecnologia_principal": "Python",
         "resumo_adaptado": perfil_json.get("resumo_profissional", ""),
         "habilidades_destacadas": [

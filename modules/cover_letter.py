@@ -27,6 +27,18 @@ def gerar_arquivo_carta_apresentacao(vaga_info: dict, analise_ia: dict, perfil_b
     localizacao = perfil_base.get("localizacao", "") if perfil_base else ""
 
     carta_texto = analise_ia.get("cover_letter", "")
+    nome_recrutador = analise_ia.get("nome_recrutador", "").strip()
+    genero_recrutador = analise_ia.get("genero_recrutador", "N/A").strip().upper()
+
+    if nome_recrutador and nome_recrutador.lower() not in ["", "vazio", "não identificado", "nao identificado"]:
+        if genero_recrutador == "M":
+            saudacao = f"Prezado {nome_recrutador},"
+        elif genero_recrutador == "F":
+            saudacao = f"Prezada {nome_recrutador},"
+        else:
+            saudacao = f"Prezado(a) {nome_recrutador},"
+    else:
+        saudacao = f"Prezado(a) Recrutador(a) / Equipe de Seleção da {vaga_info.get('empresa')},"
 
     conteudo_completo = f"""================================================================================
 CARTA DE APRESENTAÇÃO PROFISSIONAL
@@ -38,7 +50,7 @@ Contatos: {email} | Tel: {phone} | {localizacao}
 LinkedIn: {linkedin} | GitHub: {github}
 ================================================================================
 
-Prezado(a) Recrutador(a) / Equipe de Seleção da {vaga_info.get('empresa')},
+{saudacao}
 
 {carta_texto}
 
