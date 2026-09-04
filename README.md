@@ -14,7 +14,7 @@ O agente envia candidaturas automáticas por e-mail, registrando todo o históri
 agente-vagaas/
 ├── .github/
 │   └── workflows/
-│       ├── cron_agente.yml        # Varredura automática 8x ao dia (08h às 22h BRT)
+│       ├── cron_agente.yml        # Varredura automática 3x ao dia (08h às 20h BRT)
 │       ├── cron_daily_report.yml  # Relatório diário de desempenho (Daily Digest às 20h BRT)
 │       └── cron_weekly_report.yml # Relatório semanal de analytics (Domingo às 12h BRT)
 ├── modules/
@@ -104,9 +104,9 @@ agente-vagaas/
 ---
 
 ### 📲 Notificação Universal & Transparência em 100% das Execuções
-- **Feedback em 100% das Execuções**: Seja em execuções automáticas na nuvem (GitHub Actions 8x ao dia) ou manuais via Telegram (`/buscar`), o robô **sempre envia uma notificação de retorno no Telegram**.
+- **Feedback em 100% das Execuções**: Seja em execuções automáticas na nuvem (GitHub Actions 3x ao dia) ou manuais via Telegram (`/buscar`), o robô **sempre envia uma notificação de retorno no Telegram**.
 - **Relatório de Rodada Sem Vagas Novas**: Caso nenhuma vaga nova qualificada seja encontrada (vagas coletadas já processadas anteriormente ou descartadas pelos filtros), o bot avisa expressamente:
-  `🔍 [VARREDURA CONCLUÍDA - Automática (Cron 8x/dia) / Manual]`
+  `🔍 [VARREDURA CONCLUÍDA - Automática (Cron 3x/dia) / Manual]`
   `ℹ️ Resultado: Nenhuma vaga nova qualificada encontrada nesta rodada.`
   `🤖 O agente continuará monitorando automaticamente na próxima execução agendada!`
 - **Anexo Instantâneo de Documentos**: Quando vagas qualificadas inéditas são encontradas ou enviadas pelo chat, o Telegram recebe automaticamente a notificação individual acompanhada de **3 arquivos em anexo**: PDF do CV customizado, Dossiê de Entrevista (.md) e Carta de Apresentação (.txt).
@@ -306,7 +306,7 @@ Interaja com o robô em tempo real enviando os comandos:
 
 | Automação | Cron | Horário (BRT) | Descrição |
 | :--- | :--- | :--- | :--- |
-| **Varredura & Auto-Apply** | `0 1,11,13,15,17,19,21,23 * * *` | 8x ao dia (08h, 10h, 12h, 14h, 16h, 18h, 20h, 22h) | Varre a web, filtra, gera CV/Dossiê/Carta, faz Auto-Apply e notifica no Telegram. |
+| **Varredura & Auto-Apply** | `0 11,17,23 * * *` | 3x ao dia (08h, 14h, 20h) | Varre a web, filtra, gera CV/Dossiê/Carta, faz Auto-Apply e notifica no Telegram. |
 | **Relatório Diário** | `0 23 * * *` | Diariamente às 20:00 | Envia o Digest Diário com a marca visual `🤖 [RELATÓRIO DIÁRIO AUTOMÁTICO]`. |
 | **Relatório Semanal** | `0 12 * * 0` | Todo domingo às 12:00 | Envia o relatório semanal de Analytics por **E-mail** e **Telegram**. |
 

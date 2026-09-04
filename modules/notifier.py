@@ -210,7 +210,7 @@ def notificar_resumo_varredura(
     fuso_brt = timezone(timedelta(hours=-3))
     hora_atual = datetime.now(fuso_brt).strftime("%H:%M")
 
-    origem = "Manual (/buscar)" if manual else "Automática (Cron 8x/dia)"
+    origem = "Manual (/buscar)" if manual else "Automática (Cron 3x/dia)"
     alertas_manuais = max(0, vagas_novas_processadas - vagas_auto_applied)
 
     if vagas_novas_processadas > 0:
