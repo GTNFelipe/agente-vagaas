@@ -214,7 +214,7 @@ def notificar_resumo_varredura(
     alertas_manuais = max(0, vagas_novas_processadas - vagas_auto_applied)
 
     if vagas_novas_processadas > 0:
-        mensagem_motivo = f"✅ <b>Sucesso:</b> {vagas_novas_processadas} vaga(s) qualificada(s) com Match >= 80%!\n<i>(Currículo PDF, Dossiê e Carta de Apresentação gerados e anexados acima).</i>"
+        mensagem_motivo = f"✅ <b>Sucesso:</b> {vagas_novas_processadas} vaga(s) qualificada(s) com Match &gt;= 80%!\n<i>(Currículo PDF, Dossiê e Carta de Apresentação gerados e anexados acima).</i>"
     elif vagas_coletadas == 0:
         mensagem_motivo = "ℹ️ <b>Motivo:</b> Nenhuma nova vaga foi retornada pelas fontes de busca nesta rodada. Isso pode ocorrer por ausência de novas publicações recentes nas plataformas monitoradas."
     else:
@@ -227,8 +227,8 @@ def notificar_resumo_varredura(
 • 📥 <b>Vagas Coletadas na Web:</b> {vagas_coletadas}
 • 🔄 <b>Já Processadas (Duplicatas):</b> {vagas_duplicadas}
 • 🚫 <b>Inativas / Encerradas na Web:</b> {vagas_encerradas}
-• 📉 <b>Descartadas (Match < 80%):</b> {vagas_descartadas_score}
-• 🎯 <b>Vagas Qualificadas (Match >= 80%):</b> {vagas_novas_processadas}
+• 📉 <b>Descartadas (Match &lt; 80%):</b> {vagas_descartadas_score}
+• 🎯 <b>Vagas Qualificadas (Match &gt;= 80%):</b> {vagas_novas_processadas}
   ├── 🤖 <i>Auto-Applies por E-mail:</i> {vagas_auto_applied}
   └── 📩 <i>Alertas para Candidatura Manual:</i> {alertas_manuais}
 
