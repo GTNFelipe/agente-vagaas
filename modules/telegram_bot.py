@@ -8,6 +8,8 @@ import ctypes
 import html
 import requests
 import logging
+import base64
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
@@ -135,15 +137,86 @@ def consultar_uso_serpapi() -> dict:
         except Exception as e:
             logger.error("[ERRO SERPAPI ACCOUNT] %s", e)
 
-    if chaves_validas > 0:
-        return {
-            "usadas": total_usadas,
-            "restantes": total_restantes,
-            "limite": total_limite,
-            "renovacao": renovacao,
-            "chaves_ativas": chaves_validas
+        if chaves_validas > 0:
+            return {
+                "usadas": total_usadas,
+                "restantes": total_restantes,
+                "limite": total_limite,
+                "renovacao": renovacao,
+                "chaves_ativas": chaves_validas
+            }
+        return {}
+
+def extrair_texto_url(url: str) -> str:
+    """Extrai o texto visível de uma URL utilizando BeautifulSoup."""
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
-    return {}
+        resp = requests.get(url, headers=headers, timeout=15)
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.content, "html.parser")
+            for script in soup(["script", "style"]):
+                script.decompose()
+            text = soup.get_text(separator="\n", strip=True)
+            return text
+    except Exception as e:
+        logger.error("[ERRO EXTRAIR URL] %s", e)
+    return ""
+
+def extrair_texto_imagem_groq(image_path: str) -> str:
+    """Usa a Groq (modelo vision) para extrair texto de uma imagem enviada pelo Telegram."""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        logger.warning("[GROQ] GROQ_API_KEY não definida. Impossível extrair texto da imagem.")
+        return ""
+    
+    try:
+        from groq import Groq
+        client = Groq(api_key=api_key)
+        
+        with open(image_path, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            
+        prompt = "Transcreva todo o texto presente nesta imagem. Se for uma vaga de emprego, mantenha o foco nos requisitos, cargo e descrição. Retorne APENAS o texto extraído, sem comentários adicionais."
+        
+        response = client.chat.completions.create(
+            model="llama-3.2-90b-vision-preview",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            temperature=0.1
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error("[ERRO OCR GROQ] Falha ao processar imagem: %s", e)
+        return ""
+
+def resolver_texto_com_url(chat_id: str, texto: str) -> str:
+    """Verifica se há um URL no texto (e se ele é a parte principal) e tenta raspar."""
+    urls = re.findall(r'(https?://\S+)', texto)
+    if urls:
+        url = urls[0]
+        texto_sem_url = texto.replace(url, "").strip()
+        if len(texto_sem_url) < 100:
+            enviar_mensagem_telegram(chat_id, "🔗 <b>[LINK DETECTADO]</b> Acessando a página para ler a descrição da vaga...")
+            conteudo = extrair_texto_url(url)
+            if conteudo:
+                return f"{texto_sem_url}\n\n[CONTEÚDO DO SITE]:\n{conteudo}".strip()
+            else:
+                enviar_mensagem_telegram(chat_id, "⚠️ Não foi possível extrair texto do link. Prosseguindo com o texto original.")
+    return texto
 
 def comando_status() -> str:
     """Gera o relatório de status consultando o Supabase e a API do SerpAPI ao vivo."""
@@ -485,8 +558,47 @@ def comando_historico_vagas(chat_id: str):
 def processar_mensagem(update: dict):
     """Processa mensagens e comandos recebidos do Telegram."""
     message = update.get("message", {})
-    text = message.get("text", "").strip()
     chat_id = str(message.get("chat", {}).get("id", ""))
+    
+    photo_array = message.get("photo")
+    caption = message.get("caption", "").strip()
+    text = message.get("text", "").strip()
+    
+    if photo_array:
+        enviar_mensagem_telegram(chat_id, "📸 <b>[IMAGEM RECEBIDA]</b> Baixando e extraindo texto via IA (OCR)...")
+        file_id = photo_array[-1].get("file_id")
+        file_url = f"{API_URL}/getFile?file_id={file_id}"
+        try:
+            resp_file = requests.get(file_url, timeout=10)
+            if resp_file.status_code == 200:
+                file_path = resp_file.json().get("result", {}).get("file_path")
+                download_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
+                img_resp = requests.get(download_url, timeout=15)
+                if img_resp.status_code == 200:
+                    tmp_img = f"tmp_img_{chat_id}.jpg"
+                    with open(tmp_img, "wb") as f:
+                        f.write(img_resp.content)
+                    
+                    texto_extraido = extrair_texto_imagem_groq(tmp_img)
+                    
+                    if os.path.exists(tmp_img):
+                        try:
+                            os.remove(tmp_img)
+                        except Exception: pass
+                        
+                    if texto_extraido:
+                        enviar_mensagem_telegram(chat_id, "✅ <b>[LEITURA CONCLUÍDA]</b> Texto extraído com sucesso! Processando a vaga...")
+                        texto_final = f"{caption}\n\n[TEXTO DA IMAGEM]:\n{texto_extraido}".strip()
+                        texto_final = resolver_texto_com_url(chat_id, texto_final)
+                        threading.Thread(target=processar_vaga_direta, args=(chat_id, texto_final), daemon=True).start()
+                        return
+                    else:
+                        enviar_mensagem_telegram(chat_id, "⚠️ Não consegui extrair texto claro dessa imagem.")
+                        return
+        except Exception as e:
+            logger.error("Erro ao baixar/processar foto: %s", e)
+            enviar_mensagem_telegram(chat_id, "⚠️ Erro ao processar imagem.")
+            return
 
     if not text:
         return
@@ -535,6 +647,7 @@ Comandos disponíveis:
         elif cmd in ["/vaga", "/analisar"]:
             if len(partes) > 1 and partes[1].strip():
                 texto_vaga = partes[1].strip()
+                texto_vaga = resolver_texto_com_url(chat_id, texto_vaga)
                 threading.Thread(target=processar_vaga_direta, args=(chat_id, texto_vaga), daemon=True).start()
             else:
                 enviar_mensagem_telegram(chat_id, "⚠️ Por favor, envie a descrição da vaga após o comando.\nExemplo:\n<code>/vaga Desenvolvedor Python...</code>")
@@ -542,6 +655,7 @@ Comandos disponíveis:
             enviar_mensagem_telegram(chat_id, "⚠️ Comando não reconhecido. Use /ajuda para ver os comandos ou envie a descrição da vaga diretamente.")
     else:
         if len(text) >= 15:
+            text = resolver_texto_com_url(chat_id, text)
             threading.Thread(target=processar_vaga_direta, args=(chat_id, text), daemon=True).start()
         else:
             enviar_mensagem_telegram(chat_id, "ℹ️ Para analisar uma vaga, envie a descrição completa da vaga nesta conversa ou use o comando <code>/vaga &lt;descrição&gt;</code>.")
