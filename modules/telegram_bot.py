@@ -175,13 +175,28 @@ def extrair_texto_imagem_groq(image_path: str) -> str:
         from groq import Groq
         client = Groq(api_key=api_key)
         
-        with open(image_path, "rb") as image_file:
-            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+        from PIL import Image
+        import io
+        
+        # Otimizar a imagem para evitar limites de resolução da API Groq
+        with Image.open(image_path) as img:
+            # Converter para RGB se for RGBA (PNG com transparência)
+            if img.mode == 'RGBA':
+                img = img.convert('RGB')
+                
+            # Limite seguro para APIs de visão (geralmente 1024x1024 ou similar)
+            max_size = (1024, 1024)
+            img.thumbnail(max_size, Image.Resampling.LANCZOS)
+            
+            # Salvar em buffer de memória como JPEG
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=85)
+            base64_image = base64.b64encode(buffer.getvalue()).decode('utf-8')
             
         prompt = "Transcreva todo o texto presente nesta imagem. Se for uma vaga de emprego, mantenha o foco nos requisitos, cargo e descrição. Retorne APENAS o texto extraído, sem comentários adicionais."
         
         response = client.chat.completions.create(
-            model="llama-3.2-90b-vision-preview",
+            model="qwen/qwen3.8-27b",
             messages=[
                 {
                     "role": "user",
@@ -200,7 +215,13 @@ def extrair_texto_imagem_groq(image_path: str) -> str:
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        logger.error("[ERRO OCR GROQ] Falha ao processar imagem: %s", e)
+        logger.error(f"[ERRO OCR GROQ] Falha ao processar imagem: {e}")
+        try:
+            with open("debug_groq_error.log", "a") as f:
+                f.write(f"ERRO GROQ: {e}\n")
+                if hasattr(e, 'response'):
+                    f.write(f"API DETAILS: {e.response.json()}\n")
+        except: pass
         return ""
 
 def resolver_texto_com_url(chat_id: str, texto: str) -> str:
