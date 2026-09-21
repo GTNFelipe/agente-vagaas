@@ -1,6 +1,6 @@
 @echo off
 title Agente de Vagas - Bot Telegram
-cd /d "%~dp0"
+cd /d "%~dp0\.."
 echo ========================================================
 echo 🤖 INICIANDO BOT DO TELEGRAM DO AGENTE DE VAGAS...
 echo ========================================================
