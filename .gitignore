@@ -1,14 +1,36 @@
+# Environments
 .env
 .venv/
 venv/
+env/
+
+# Python caches
 __pycache__/
-*.pyc
-*.pdf
+*.py[cod]
+*$py.class
+
+# IDE and OS files
 .DS_Store
 .idea/
 .vscode/
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Test and Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Local data & Outputs
+*.pdf
 curriculos_gerados/
 dossies_vagas/
 cartas_apresentacao/
 master_profile.json
 vagas_processadas.json
+serpapi_daily_tracker.json
