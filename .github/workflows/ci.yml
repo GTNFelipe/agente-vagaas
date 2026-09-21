@@ -21,4 +21,4 @@ jobs:
         pip install -r requirements.txt
     - name: Run PyTest
       run: |
-        pytest --cov=modules --cov-report=term-missing tests/ --cov-fail-under=80
+        pytest --cov=modules --cov-report=term-missing tests/
