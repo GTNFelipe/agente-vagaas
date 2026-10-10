@@ -246,6 +246,9 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
 
     enviar_mensagem_telegram(chat_id, "🤔 <i>Pensando...</i>")
     try:
+        # Puxa o status real do dia para injetar na IA
+        contexto_hoje = gerar_relatorio_diario_telegram(automatico=True)
+        
         from groq import Groq
         client = Groq(api_key=api_key)
         
@@ -253,7 +256,8 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
             "Você é o Agente de Vagas, o assistente pessoal super inteligente do Felipe. "
             "Você é especialista em engenharia de software, recrutamento e vagas de emprego. "
             "Sua missão é responder de forma direta, prestativa e amigável (como um chatbot no Telegram). "
-            "Seja sucinto, não mande textos longos demais. Use emojis para deixar a conversa leve."
+            "Seja sucinto, não mande textos longos demais. Use emojis para deixar a conversa leve.\n\n"
+            f"Aqui estão os dados reais do seu desempenho hoje (use isso para responder se o usuário perguntar sobre as vagas de hoje):\n{contexto_hoje}"
         )
         
         response = client.chat.completions.create(
