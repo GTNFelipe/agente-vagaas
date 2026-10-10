@@ -249,6 +249,29 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
         # Puxa o status real do dia para injetar na IA
         contexto_hoje = gerar_relatorio_diario_telegram(automatico=True)
         
+        # Puxa o detalhamento das vagas do dia para a IA saber quais foram
+        detalhes_vagas = "Lista de vagas analisadas hoje:\n"
+        from modules.database import inicializar_supabase
+        from datetime import datetime, timedelta, timezone
+        supabase = inicializar_supabase()
+        if supabase:
+            fuso_brt = timezone(timedelta(hours=-3))
+            inicio_dia_brt = datetime.now(fuso_brt).replace(hour=0, minute=0, second=0, microsecond=0)
+            inicio_utc_str = inicio_dia_brt.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                # Busca as vagas processadas hoje (incluindo as não qualificadas)
+                res = supabase.table("vagas_processadas").select("titulo_vaga, empresa, match_score, status_candidatura").gte("created_at", inicio_utc_str).execute()
+                vagas_hoje = res.data or []
+                if vagas_hoje:
+                    for v in vagas_hoje:
+                        detalhes_vagas += f"- {v.get('titulo_vaga')} na {v.get('empresa')} (Match: {v.get('match_score')}% | Status: {v.get('status_candidatura')})\n"
+                else:
+                    detalhes_vagas += "Nenhuma vaga processada no banco de dados hoje ainda."
+            except Exception as e:
+                detalhes_vagas += f"(Erro ao buscar detalhes: {e})"
+        else:
+            detalhes_vagas += "(Supabase offline)"
+
         from groq import Groq
         client = Groq(api_key=api_key)
         
@@ -257,7 +280,7 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
             "Você é especialista em engenharia de software, recrutamento e vagas de emprego. "
             "Sua missão é responder de forma direta, prestativa e amigável (como um chatbot no Telegram). "
             "Seja sucinto, não mande textos longos demais. Use emojis para deixar a conversa leve.\n\n"
-            f"Aqui estão os dados reais do seu desempenho hoje (use isso para responder se o usuário perguntar sobre as vagas de hoje):\n{contexto_hoje}"
+            f"Aqui estão os dados reais do seu desempenho hoje (use isso para responder se o usuário perguntar sobre as vagas de hoje):\n{contexto_hoje}\n\n{detalhes_vagas}"
         )
         
         response = client.chat.completions.create(
