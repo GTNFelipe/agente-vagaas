@@ -246,31 +246,63 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
 
     enviar_mensagem_telegram(chat_id, "🤔 <i>Pensando...</i>")
     try:
-        # Puxa o status real do dia para injetar na IA
-        contexto_hoje = gerar_relatorio_diario_telegram(automatico=True)
-        
-        # Puxa o detalhamento das vagas do dia para a IA saber quais foram
-        detalhes_vagas = "Lista de vagas analisadas hoje:\n"
         from modules.database import inicializar_supabase
         from datetime import datetime, timedelta, timezone
         supabase = inicializar_supabase()
+        
+        # 1. Puxa o status real do dia
+        contexto_hoje = gerar_relatorio_diario_telegram(automatico=True)
+        
+        # 2. Puxa perfil do usuário para a IA saber as preferências
+        perfil = "Desconhecido"
+        try:
+            import json
+            with open("master_profile.json", "r", encoding="utf-8") as f:
+                mp = json.load(f)
+                perfil = f"Objetivo: {mp.get('objetivo_profissional', 'Dev')}, Senioridade alvo: Pleno/Sênior, Local: {mp.get('preferencias_vaga', {}).get('modelo_trabalho', 'Remoto')}."
+        except:
+            pass
+
+        # 3. Puxa o detalhamento ampliado do Supabase
+        detalhes_vagas = ""
         if supabase:
-            fuso_brt = timezone(timedelta(hours=-3))
-            inicio_dia_brt = datetime.now(fuso_brt).replace(hour=0, minute=0, second=0, microsecond=0)
-            inicio_utc_str = inicio_dia_brt.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S")
             try:
-                # Busca as vagas processadas hoje (incluindo as não qualificadas)
-                res = supabase.table("vagas_processadas").select("titulo_vaga, empresa, match_score, status_candidatura").gte("created_at", inicio_utc_str).execute()
-                vagas_hoje = res.data or []
+                # Vagas de hoje
+                fuso_brt = timezone(timedelta(hours=-3))
+                inicio_dia = datetime.now(fuso_brt).replace(hour=0, minute=0, second=0, microsecond=0)
+                inicio_str = inicio_dia.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                
+                res_hoje = supabase.table("vagas_processadas").select("titulo_vaga, empresa, match_score, status_candidatura").gte("created_at", inicio_str).execute()
+                vagas_hoje = res_hoje.data or []
+                detalhes_vagas += "--- VAGAS ANALISADAS HOJE ---\n"
                 if vagas_hoje:
                     for v in vagas_hoje:
-                        detalhes_vagas += f"- {v.get('titulo_vaga')} na {v.get('empresa')} (Match: {v.get('match_score')}% | Status: {v.get('status_candidatura')})\n"
+                        detalhes_vagas += f"- {v.get('titulo_vaga')} | {v.get('empresa')} | Match: {v.get('match_score')}% | Status: {v.get('status_candidatura')}\n"
                 else:
-                    detalhes_vagas += "Nenhuma vaga processada no banco de dados hoje ainda."
+                    detalhes_vagas += "Nenhuma hoje.\n"
+
+                # Últimas 5 vagas que deram MATCH / CANDIDATURA (All time)
+                res_match = supabase.table("vagas_processadas").select("titulo_vaga, empresa, created_at").eq("status_candidatura", "qualificada").order("created_at", desc=True).limit(5).execute()
+                vagas_match = res_match.data or []
+                detalhes_vagas += "\n--- ÚLTIMAS 5 VAGAS APROVADAS (HISTÓRICO) ---\n"
+                if vagas_match:
+                    for v in vagas_match:
+                        detalhes_vagas += f"- {v.get('titulo_vaga')} | {v.get('empresa')} ({v.get('created_at')[:10]})\n"
+                else:
+                    detalhes_vagas += "Nenhuma vaga aprovada no histórico.\n"
+
+                # Estatísticas Gerais (All time)
+                res_all = supabase.table("vagas_processadas").select("status_candidatura").execute()
+                all_data = res_all.data or []
+                tot = len(all_data)
+                tot_aprov = len([x for x in all_data if x.get("status_candidatura") == "qualificada"])
+                tot_reprov = tot - tot_aprov
+                detalhes_vagas += f"\n--- ESTATÍSTICAS TOTAIS (TODOS OS TEMPOS) ---\nTotal analisadas: {tot}\nAprovadas (Qualificadas): {tot_aprov}\nReprovadas/Descartadas: {tot_reprov}\n"
+
             except Exception as e:
-                detalhes_vagas += f"(Erro ao buscar detalhes: {e})"
+                detalhes_vagas += f"\n(Erro ao buscar histórico: {e})"
         else:
-            detalhes_vagas += "(Supabase offline)"
+            detalhes_vagas += "\n(Supabase offline)"
 
         from groq import Groq
         client = Groq(api_key=api_key)
@@ -279,8 +311,11 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
             "Você é o Agente de Vagas, o assistente pessoal super inteligente do Felipe. "
             "Você é especialista em engenharia de software, recrutamento e vagas de emprego. "
             "Sua missão é responder de forma direta, prestativa e amigável (como um chatbot no Telegram). "
-            "Seja sucinto, não mande textos longos demais. Use emojis para deixar a conversa leve.\n\n"
-            f"Aqui estão os dados reais do seu desempenho hoje (use isso para responder se o usuário perguntar sobre as vagas de hoje):\n{contexto_hoje}\n\n{detalhes_vagas}"
+            "Use emojis para deixar a conversa leve.\n\n"
+            f"**Perfil do Felipe**: {perfil}\n\n"
+            f"**Resumo de Hoje**:\n{contexto_hoje}\n\n"
+            f"**Contexto Completo do Banco de Dados**:\n{detalhes_vagas}\n\n"
+            "Instruções: Se o usuário perguntar sobre vagas, use o contexto acima para responder. Se ele perguntar algo que não está aí, seja honesto. Se ele fizer perguntas técnicas, responda normalmente."
         )
         
         response = client.chat.completions.create(
