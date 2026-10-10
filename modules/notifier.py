@@ -4,16 +4,19 @@ import html
 import smtplib
 import requests
 import logging
+from typing import Dict, Any, List, Optional
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
-def realizar_candidatura_auto_email(vaga_info: dict, analise_ia: dict, caminho_pdf: str, perfil_base: dict = None) -> bool:
+def realizar_candidatura_auto_email(vaga_info: Dict[str, Any], analise_ia: Dict[str, Any], caminho_pdf: str, perfil_base: Optional[Dict[str, Any]] = None) -> bool:
     """
     Envia o e-mail de candidatura DIRETO para o recrutador e envia uma CÓPIA para o candidato.
     """
+    if not isinstance(vaga_info, dict) or not isinstance(analise_ia, dict):
+        raise ValueError("[FAIL FAST] Dicionarios passados para realizar_candidatura_auto_email sao invalidos.")
     remetente = os.getenv("GMAIL_USER")
     senha_app = os.getenv("GMAIL_APP_PASSWORD")
     email_recrutador = vaga_info.get("email_candidatura")
@@ -98,11 +101,14 @@ def realizar_candidatura_auto_email(vaga_info: dict, analise_ia: dict, caminho_p
         logger.error("Erro ao enviar candidatura por e-mail: %s", e)
         return False
 
-def enviar_notificacao_telegram(vaga_info: dict, analise_ia: dict, caminho_pdf: str = None, caminho_dossie: str = None, caminho_carta: str = None, modo_candidatura: str = "manual") -> bool:
+def enviar_notificacao_telegram(vaga_info: Dict[str, Any], analise_ia: Dict[str, Any], caminho_pdf: Optional[str] = None, caminho_dossie: Optional[str] = None, caminho_carta: Optional[str] = None, modo_candidatura: str = "manual") -> bool:
     """
     Dispara notificações ricas e exclusivas com botões inline diretamente para o Telegram do usuário.
     """
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not isinstance(vaga_info, dict) or not isinstance(analise_ia, dict):
+        raise ValueError("[FAIL FAST] Dicionarios passados para enviar_notificacao_telegram sao invalidos.")
+        
+    token: Optional[str] = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
 
     if not token or not chat_id:
@@ -194,14 +200,14 @@ def notificar_resumo_varredura(
     vagas_descartadas_score: int = 0,
     vagas_auto_applied: int = 0,
     manual: bool = False,
-    chat_id: str = None
-):
+    chat_id: Optional[str] = None
+) -> bool:
     """
     Envia uma mensagem de feedback detalhada no Telegram após a conclusão de qualquer varredura (automática 8x/dia ou manual).
     Explica exatamente o resultado da execução, justificando o porquê de cada vaga ter sido aceita, descartada ou pulada.
     """
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    target_chat = chat_id or os.getenv("TELEGRAM_CHAT_ID")
+    token: Optional[str] = os.getenv("TELEGRAM_BOT_TOKEN")
+    target_chat: Optional[str] = chat_id or os.getenv("TELEGRAM_CHAT_ID")
 
     if not token or not target_chat:
         return False

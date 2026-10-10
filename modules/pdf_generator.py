@@ -1,14 +1,23 @@
 import os
 import html
+import logging
+from typing import Dict, Any, List
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-def gerar_pdf_curriculo(perfil_base: dict, analise_ia: dict, output_filename: str = "curriculo_otimizado.pdf") -> str:
+logger: logging.Logger = logging.getLogger(__name__)
+
+def gerar_pdf_curriculo(perfil_base: Dict[str, Any], analise_ia: Dict[str, Any], output_filename: str = "curriculo_otimizado.pdf") -> str:
     """
     Gera um PDF formatado e limpo para ATS com base no perfil adaptado pela IA.
     """
+    if not perfil_base or not isinstance(perfil_base, dict):
+        raise ValueError("[FAIL FAST] O dicionário perfil_base é inválido ou está vazio.")
+    if not analise_ia or not isinstance(analise_ia, dict):
+        raise ValueError("[FAIL FAST] O dicionário analise_ia é inválido ou está vazio.")
+
     doc = SimpleDocTemplate(
         output_filename,
         pagesize=letter,

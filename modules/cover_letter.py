@@ -2,13 +2,16 @@ import os
 import re
 import logging
 from datetime import datetime
+from typing import Dict, Any
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
-def gerar_arquivo_carta_apresentacao(vaga_info: dict, analise_ia: dict, perfil_base: dict, output_dir: str = "cartas_apresentacao") -> str:
+def gerar_arquivo_carta_apresentacao(vaga_info: Dict[str, Any], analise_ia: Dict[str, Any], perfil_base: Dict[str, Any], output_dir: str = "cartas_apresentacao") -> str:
     """
     Gera um arquivo formatado (.txt / .md) da Carta de Apresentação de Alto Impacto para a vaga.
     """
+    if not isinstance(vaga_info, dict) or not isinstance(analise_ia, dict) or not isinstance(perfil_base, dict):
+        raise ValueError("[FAIL FAST] Um ou mais dicionarios passados para gerar_arquivo_carta_apresentacao sao invalidos.")
     os.makedirs(output_dir, exist_ok=True)
 
     titulo = vaga_info.get("titulo", "Vaga_Desconhecida")

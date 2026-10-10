@@ -1,5 +1,6 @@
 import os
 import smtplib
+from typing import Dict, Any, List, Optional
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
@@ -7,25 +8,25 @@ from modules.database import inicializar_supabase
 
 load_dotenv()
 
-def gerar_relatorio_semanal():
-    supabase = inicializar_supabase()
+def gerar_relatorio_semanal() -> None:
+    supabase: Any = inicializar_supabase()
     if not supabase:
         print("[AVISO] Supabase nao disponivel para o relatorio.")
         return
 
     try:
         from datetime import datetime, timezone, timedelta
-        sete_dias_atras = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-        res = supabase.table("vagas_processadas").select("*").gte("created_at", sete_dias_atras).execute()
-        dados = res.data or []
+        sete_dias_atras: str = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        res: Any = supabase.table("vagas_processadas").select("*").gte("created_at", sete_dias_atras).execute()
+        dados: List[Dict[str, Any]] = res.data or []
 
-        total_vagas = len(dados)
-        candidatadas_auto = len([v for v in dados if v.get("status_candidatura") == "candidatado_auto"])
-        alertas_manuais = len([v for v in dados if v.get("status_candidatura") == "alerta_manual"])
-        descartadas = len([v for v in dados if v.get("status_candidatura") == "descartado"])
+        total_vagas: int = len(dados)
+        candidatadas_auto: int = len([v for v in dados if v.get("status_candidatura") == "candidatado_auto"])
+        alertas_manuais: int = len([v for v in dados if v.get("status_candidatura") == "alerta_manual"])
+        descartadas: int = len([v for v in dados if v.get("status_candidatura") == "descartado"])
         
-        scores = [v.get("match_score", 0) for v in dados if v.get("match_score")]
-        media_score = round(sum(scores) / len(scores), 1) if scores else 0
+        scores: List[float] = [float(v.get("match_score", 0)) for v in dados if v.get("match_score")]
+        media_score: float = round(sum(scores) / len(scores), 1) if scores else 0.0
 
         remetente = os.getenv("GMAIL_USER")
         senha_app = os.getenv("GMAIL_APP_PASSWORD")

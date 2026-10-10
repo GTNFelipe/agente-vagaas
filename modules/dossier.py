@@ -2,14 +2,17 @@ import os
 import re
 import logging
 from datetime import datetime
+from typing import Dict, Any, List
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
-def gerar_dossie_vaga(vaga_info: dict, analise_ia: dict, output_dir: str = "dossies_vagas") -> str:
+def gerar_dossie_vaga(vaga_info: Dict[str, Any], analise_ia: Dict[str, Any], output_dir: str = "dossies_vagas") -> str:
     """
     Gera um Dossiê completo de Preparação para Entrevista em formato Markdown (.md)
     com base nas análises e insights da IA sobre a vaga.
     """
+    if not isinstance(vaga_info, dict) or not isinstance(analise_ia, dict):
+        raise ValueError("[FAIL FAST] Dicionarios passados para gerar_dossie_vaga sao invalidos.")
     os.makedirs(output_dir, exist_ok=True)
 
     titulo = vaga_info.get("titulo", "Vaga_Desconhecida")

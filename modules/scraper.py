@@ -6,8 +6,9 @@ import logging
 import requests
 from datetime import datetime
 from bs4 import BeautifulSoup
+from typing import Dict, Any, List, Optional, Tuple
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -307,16 +308,19 @@ SENIORIDADE_ALTA_REGEX = [
 ]
 SENIORIDADE_ALTA_COMPILED = [re.compile(p, re.IGNORECASE) for p in SENIORIDADE_ALTA_REGEX]
 
-def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
+def eh_cargo_e_nivel_permitido(vaga: Dict[str, Any]) -> bool:
     """
     Filtra estritamente para garantir que a vaga seja de Desenvolvedor ou Analista de Sistemas/Automação:
     - COBOL, Mainframe, Analista de Sistemas e Java: APENAS nível JÚNIOR / TRAINEE.
     - Automação / n8n: Nível JÚNIOR, TRAINEE ou PLENO.
     Descarte para: Professor/Docente, Vendas/Comercial, Scrum Master/PO/PM, Design/UX, Cloud, DevOps, SRE, Dados, Suporte e nível Sênior/Lead.
     """
-    titulo = str(vaga.get("titulo", "")).lower()
-    descricao = str(vaga.get("descricao", "")).lower()
-    texto_completo = f"{titulo} {descricao}"
+    if not vaga or not isinstance(vaga, dict):
+        raise ValueError("[FAIL FAST] Dicionário de vaga inválido em eh_cargo_e_nivel_permitido.")
+        
+    titulo: str = str(vaga.get("titulo", "")).lower()
+    descricao: str = str(vaga.get("descricao", "")).lower()
+    texto_completo: str = f"{titulo} {descricao}"
 
     # 1. Descarte imediato de áreas/funções não desejadas no título (Ensino, Vendas, Cloud, DevOps, SRE, Dados, Suporte)
     for area_pat in CARGOS_EXCLUIDOS_COMPILED:
@@ -380,16 +384,19 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
 
     return True
 
-def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
+def eh_vaga_remota_ou_rj(vaga: Dict[str, Any]) -> bool:
     """
     Verifica se a vaga é:
     1. 100% Remota, em qualquer lugar do mundo.
     2. Híbrida ou Presencial, ESTRITAMENTE localizada no Rio de Janeiro.
     """
-    titulo = str(vaga.get("titulo", "")).lower()
-    empresa = str(vaga.get("empresa", "")).lower()
-    descricao = str(vaga.get("descricao", "")).lower()
-    texto = f"{titulo} {empresa} {descricao}"
+    if not vaga or not isinstance(vaga, dict):
+        raise ValueError("[FAIL FAST] Dicionário de vaga inválido em eh_vaga_remota_ou_rj.")
+        
+    titulo: str = str(vaga.get("titulo", "")).lower()
+    empresa: str = str(vaga.get("empresa", "")).lower()
+    descricao: str = str(vaga.get("descricao", "")).lower()
+    texto: str = f"{titulo} {empresa} {descricao}"
 
     eh_hibrido = bool(re.search(r'\b(h[ií]brid[oa]|hybrid|hibrida)\b', texto))
     eh_presencial = bool(re.search(r'\b(presencial|on-site|onsite|no\s+escrit[oó]rio|in\s*office)\b', texto))
@@ -629,15 +636,15 @@ def buscar_vagas_linkedin_publico(keywords: str, location: str = "Brasil") -> li
 
     return vagas
 
-def executar_varredura_completa(cargos_alvo: list = None):
+def executar_varredura_completa(cargos_alvo: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """
     Orquestra a varredura multicanal em todas as fontes (Google Jobs via SerpAPI, LinkedIn Público, Programathor, Fóruns GitHub e RSS).
     Utiliza pesquisas direcionadas por cargo alvo para garantir máximo rendimento de vagas.
     """
-    todas_vagas = []
+    todas_vagas: List[Dict[str, Any]] = []
     
     # Buscas direcionadas no Google Jobs por categoria/tecnologia
-    queries_google = [
+    queries_google: List[str] = [
         "Desenvolvedor Backend Junior Remote",
         "Desenvolvedor Fullstack Junior Remote",
         "Desenvolvedor Frontend Junior React Remote",

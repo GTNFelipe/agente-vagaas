@@ -11,8 +11,9 @@ import logging
 import base64
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from typing import Dict, Any, List, Optional
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 # Configura encoding de saída para evitar crash com emojis no console do Windows (cp1252)
 if hasattr(sys.stdout, "reconfigure"):
@@ -93,12 +94,17 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
-def enviar_mensagem_telegram(chat_id: str, texto: str):
+def enviar_mensagem_telegram(chat_id: str, texto: str) -> None:
     """Envia mensagem formatada em HTML para o chat do Telegram."""
+    if not isinstance(chat_id, str) or not isinstance(texto, str):
+        logger.warning("[FAIL FAST] chat_id e texto devem ser strings válidas.")
+        return
+        
     if not TELEGRAM_TOKEN or not chat_id:
         return
-    url = f"{API_URL}/sendMessage"
-    payload = {
+        
+    url: str = f"{API_URL}/sendMessage"
+    payload: Dict[str, Any] = {
         "chat_id": chat_id,
         "text": texto,
         "parse_mode": "HTML",
@@ -107,9 +113,9 @@ def enviar_mensagem_telegram(chat_id: str, texto: str):
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        logger.error("[ERRO TELEGRAM] Falha ao enviar mensagem: %s", e)
+        logger.warning("[ERRO TELEGRAM] Falha ao enviar mensagem: %s", e)
 
-def consultar_uso_serpapi() -> dict:
+def consultar_uso_serpapi() -> Dict[str, Any]:
     """Consulta os dados reais de uso da API SerpAPI diretamente na API oficial (consolida todas as chaves configuradas)."""
     raw_keys = os.getenv("SERPAPI_KEYS") or os.getenv("SERPAPI_KEY") or ""
     chaves = [k.strip() for k in re.split(r"[,;\s]+", raw_keys) if k.strip()]
@@ -149,19 +155,22 @@ def consultar_uso_serpapi() -> dict:
 
 def extrair_texto_url(url: str) -> str:
     """Extrai o texto visível de uma URL utilizando BeautifulSoup."""
+    if not url or not isinstance(url, str):
+        raise ValueError("[FAIL FAST] URL fornecida para extração de texto é inválida.")
+        
     try:
-        headers = {
+        headers: Dict[str, str] = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
-        resp = requests.get(url, headers=headers, timeout=15)
+        resp: requests.Response = requests.get(url, headers=headers, timeout=15)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.content, "html.parser")
             for script in soup(["script", "style"]):
                 script.decompose()
-            text = soup.get_text(separator="\n", strip=True)
+            text: str = soup.get_text(separator="\n", strip=True)
             return text
     except Exception as e:
-        logger.error("[ERRO EXTRAIR URL] %s", e)
+        logger.warning("[ERRO EXTRAIR URL] %s", e)
     return ""
 
 def extrair_texto_imagem_groq(image_path: str) -> str:

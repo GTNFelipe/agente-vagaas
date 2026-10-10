@@ -4,13 +4,14 @@ import sys
 import re
 import time
 import logging
+from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -35,28 +36,37 @@ from modules.notifier import realizar_candidatura_auto_email, enviar_notificacao
 
 load_dotenv()
 
-def carregar_perfil_base() -> dict:
+def carregar_perfil_base() -> Dict[str, Any]:
     if os.environ.get("MASTER_PROFILE_JSON"):
-        return json.loads(os.environ["MASTER_PROFILE_JSON"])
+        perfil_env = json.loads(os.environ["MASTER_PROFILE_JSON"])
+        if not isinstance(perfil_env, dict):
+            raise ValueError("[FAIL FAST] MASTER_PROFILE_JSON deve conter um dicionário válido.")
+        return perfil_env
+        
     if os.path.exists("master_profile.json"):
         with open("master_profile.json", "r", encoding="utf-8") as f:
-            return json.load(f)
+            perfil_file = json.load(f)
+            if not isinstance(perfil_file, dict):
+                raise ValueError("[FAIL FAST] O conteúdo de master_profile.json não é um dicionário válido.")
+            return perfil_file
+            
     raise FileNotFoundError("Perfil mestre não encontrado. Defina a variável MASTER_PROFILE_JSON ou crie o arquivo master_profile.json.")
 
-
-def extrair_email_texto(texto: str) -> str:
-    emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', texto)
+def extrair_email_texto(texto: Optional[str]) -> Optional[str]:
+    if not texto:
+        return None
+    emails: List[str] = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', texto)
     return emails[0] if emails else None
 
-def main(manual: bool = False, target_chat_id: str = None):
+def main(manual: bool = False, target_chat_id: Optional[str] = None) -> None:
     logger.info("[INICIO] Executando Agente de Vagas & Candidatura Autonoma (Fase 3)...")
     
-    perfil_base = carregar_perfil_base()
-    cargos_alvo = perfil_base.get("cargos_alvo", ["Desenvolvedor COBOL", "Desenvolvedor Java Junior"])
-    supabase_client = inicializar_supabase()
+    perfil_base: Dict[str, Any] = carregar_perfil_base()
+    cargos_alvo: List[str] = perfil_base.get("cargos_alvo", ["Desenvolvedor COBOL", "Desenvolvedor Java Junior"])
+    supabase_client: Any = inicializar_supabase()
 
     # 1. Coleta Vagas na Web
-    vagas_encontradas = coletar_vagas_todas_fontes(cargos_alvo)
+    vagas_encontradas: List[Dict[str, Any]] = coletar_vagas_todas_fontes(cargos_alvo)
 
     if not vagas_encontradas:
         logger.info("Nenhuma vaga encontrada nesta rodada.")
@@ -64,38 +74,45 @@ def main(manual: bool = False, target_chat_id: str = None):
         return
 
     # 2. Processamento
-    vagas_novas_processadas = 0
-    vagas_duplicadas = 0
-    vagas_encerradas = 0
-    vagas_descartadas_score = 0
-    vagas_auto_applied = 0
+    vagas_novas_processadas: int = 0
+    vagas_duplicadas: int = 0
+    vagas_encerradas: int = 0
+    vagas_descartadas_score: int = 0
+    vagas_auto_applied: int = 0
 
     for vaga in vagas_encontradas:
-        link = vaga.get("link")
-        titulo = vaga.get("titulo")
+        if not isinstance(vaga, dict):
+            logger.warning("[WARNING] Estrutura de vaga ignorada por nao ser dicionario.")
+            continue
+            
+        link: Optional[str] = vaga.get("link")
+        titulo: str = str(vaga.get("titulo", "Titulo Desconhecido"))
+        empresa: str = str(vaga.get("empresa", "Empresa Desconhecida"))
 
         if vaga_ja_processada(supabase_client, vaga):
             vagas_duplicadas += 1
-            logger.info("[SKIP] Vaga ja registrada/candidatada: '%s' (%s). Pulando...", titulo, vaga.get('empresa'))
+            logger.info("[SKIP] Vaga ja registrada/candidatada: '%s' (%s). Pulando...", titulo, empresa)
             continue
 
         # Validação de status em tempo real na web
         if link and not vaga_ainda_ativa(link):
             vagas_encerradas += 1
-            logger.info("[SKIP] Vaga ENCERRADA ou Inativa na web: '%s' (%s). Pulando...", titulo, vaga.get('empresa'))
+            logger.info("[SKIP] Vaga ENCERRADA ou Inativa na web: '%s' (%s). Pulando...", titulo, empresa)
             salvar_vaga_processada(supabase_client, vaga, {"match_score": 0, "justificativa_match": "Vaga encerrada ou inativa na web"}, status_candidatura="encerrada")
             continue
 
-        logger.info("\n[VAGA] Analisando: %s - %s", titulo, vaga.get('empresa'))
-        analise = adaptar_curriculo(vaga.get("descricao", titulo), perfil_base)
-        match_score = analise.get("match_score", 0)
+        logger.info("\n[VAGA] Analisando: %s - %s", titulo, empresa)
+        
+        descricao_segura: str = str(vaga.get("descricao", titulo))
+        analise: Dict[str, Any] = adaptar_curriculo(descricao_segura, perfil_base)
+        match_score: int = int(analise.get("match_score", 0))
         logger.info("[SCORE] Score de Match: %s%%", match_score)
 
         if match_score >= 80:
-            clean_empresa = (re.sub(r'[^\w\-_]', '_', str(vaga.get("empresa", "Empresa"))).strip("_")[:30]) or "Empresa"
+            clean_empresa: str = (re.sub(r'[^\w\-_]', '_', empresa).strip("_")[:30]) or "Empresa"
             
             # 1. Gerar e SALVAR o PDF do Currículo Otimizado em pasta dedicada
-            pasta_cvs = "curriculos_gerados"
+            pasta_cvs: str = "curriculos_gerados"
             os.makedirs(pasta_cvs, exist_ok=True)
             nome_candidato_clean = (re.sub(r'[^\w\-_]', '_', str(perfil_base.get("nome", "Candidato"))).strip("_")[:30]) or "Candidato"
             nome_arquivo_pdf = f"CV_{nome_candidato_clean}_{clean_empresa}.pdf"

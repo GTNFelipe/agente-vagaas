@@ -3,10 +3,10 @@ import json
 import re
 import logging
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, Dict, List
 from dotenv import load_dotenv
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 try:
     from supabase import create_client, Client
@@ -50,22 +50,27 @@ def inicializar_supabase() -> Optional[Client]:
         logger.exception("Falha ao conectar no Supabase")
         return None
 
-def _carregar_vagas_locais() -> list:
+def _carregar_vagas_locais() -> List[Dict[str, Any]]:
     if os.path.exists(LOCAL_DB_FILE):
         try:
             with open(LOCAL_DB_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            logger.exception("Erro ao carregar cache local de vagas")
+                data = json.load(f)
+                if not isinstance(data, list):
+                    raise ValueError("Conteudo local nao e uma lista.")
+                return data
+        except Exception as e:
+            logger.warning(f"Erro ao carregar cache local de vagas: {e}")
             return []
     return []
 
-def _salvar_vagas_locais(vagas: list):
+def _salvar_vagas_locais(vagas: List[Dict[str, Any]]) -> None:
+    if not isinstance(vagas, list):
+        raise ValueError("[FAIL FAST] A variavel vagas deve ser uma lista.")
     try:
         with open(LOCAL_DB_FILE, "w", encoding="utf-8") as f:
             json.dump(vagas, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        logger.exception("Nao foi possivel salvar cache local de vagas")
+        logger.warning(f"Nao foi possivel salvar cache local de vagas: {e}")
 
 def _normalizar_string(s: str) -> str:
     if not s:
@@ -84,18 +89,21 @@ def vaga_ja_processada(supabase: Optional[Client], vaga_or_link: Any) -> bool:
     Verifica se a vaga já foi registrada ou candidatada anteriormente.
     Consulta tanto o arquivo local (vagas_processadas.json) quanto o Supabase.
     """
+    if not vaga_or_link:
+        raise ValueError("[FAIL FAST] Vaga ou Link invalido passado para vaga_ja_processada.")
+
     if isinstance(vaga_or_link, dict):
-        link = vaga_or_link.get("link", "") or ""
-        titulo = vaga_or_link.get("titulo", "") or ""
-        empresa = vaga_or_link.get("empresa", "") or ""
+        link: str = str(vaga_or_link.get("link", ""))
+        titulo: str = str(vaga_or_link.get("titulo", ""))
+        empresa: str = str(vaga_or_link.get("empresa", ""))
     else:
-        link = str(vaga_or_link) if vaga_or_link else ""
+        link: str = str(vaga_or_link)
         titulo = ""
         empresa = ""
 
-    norm_link = _normalizar_url(link)
-    norm_titulo = _normalizar_string(titulo)
-    norm_empresa = _normalizar_string(empresa)
+    norm_link: str = _normalizar_url(link)
+    norm_titulo: str = _normalizar_string(titulo)
+    norm_empresa: str = _normalizar_string(empresa)
 
     # 1. Checar no cache local (vagas_processadas.json)
     vagas_locais = _carregar_vagas_locais()
