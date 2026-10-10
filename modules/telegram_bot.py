@@ -257,7 +257,7 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
         )
         
         response = client.chat.completions.create(
-            model="llama3-70b-8192",
+            model="qwen/qwen3.8-27b",
             messages=[
                 {"role": "system", "content": prompt_sistema},
                 {"role": "user", "content": texto_usuario}
