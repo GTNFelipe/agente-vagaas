@@ -648,7 +648,6 @@ def executar_varredura_completa(cargos_alvo: list[str] | None = None) -> list[di
     queries_google: list[str] = [
         "Desenvolvedor Backend Junior Remote",
         "Desenvolvedor Fullstack Junior Remote",
-        "Desenvolvedor Frontend Junior React Remote",
         "Desenvolvedor COBOL Mainframe Junior Remote",
         "Analista COBOL Mainframe Junior Remote",
         "Analista de Sistemas Junior Remote",
@@ -675,7 +674,6 @@ def executar_varredura_completa(cargos_alvo: list[str] | None = None) -> list[di
     queries_linkedin = [
         "Desenvolvedor Backend Junior",
         "Desenvolvedor Fullstack Junior",
-        "Desenvolvedor Frontend Junior React",
         "Desenvolvedor COBOL Mainframe Junior",
         "Analista COBOL Mainframe Junior",
         "Analista de Sistemas Junior",

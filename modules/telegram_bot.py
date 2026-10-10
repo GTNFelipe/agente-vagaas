@@ -319,7 +319,7 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
             f"**Perfil do Felipe**: {perfil}\n\n"
             "**Termos Reais de Busca do Robô (Scraper)**:\n"
             "Atualmente, o scraper roda todos os dias com queries fixas rotativas no Google Jobs e LinkedIn Público. "
-            "As queries exatas são: 'Desenvolvedor Backend Junior', 'Desenvolvedor Fullstack Junior', 'Desenvolvedor Frontend Junior React', "
+            "As queries exatas são: 'Desenvolvedor Backend Junior', 'Desenvolvedor Fullstack Junior', "
             "'Desenvolvedor COBOL Mainframe Junior', 'Analista COBOL Mainframe Junior', 'Analista de Sistemas Junior', 'Analista de Automação n8n Junior' e 'Desenvolvedor Low code No code Junior'. "
             "(Ele não puxa palavras-chave soltas do master profile para buscar, mas usa o master profile na hora de dar o MATCH nas vagas encontradas).\n\n"
             f"**Resumo de Hoje**:\n{contexto_hoje}\n\n"
