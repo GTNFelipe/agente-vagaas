@@ -72,13 +72,16 @@ def gerar_pdf_curriculo(perfil_base: dict, analise_ia: dict, output_filename: st
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#CBD5E0'), spaceAfter=10))
 
     # 2. Resumo Adaptado
-    story.append(Paragraph("<b>RESUMO PROFISSIONAL</b>", section_style))
+    is_english = analise_ia.get("is_english", False)
+    t_resumo = "PROFESSIONAL SUMMARY" if is_english else "RESUMO PROFISSIONAL"
+    story.append(Paragraph(f"<b>{t_resumo}</b>", section_style))
     resumo_raw = str(analise_ia.get("resumo_adaptado") or perfil_base.get("resumo_profissional") or "")
     story.append(Paragraph(html.escape(resumo_raw), body_style))
     story.append(Spacer(1, 10))
 
     # 3. Habilidades Destacadas (100% Fatuais)
-    story.append(Paragraph("<b>HABILIDADES TÉCNICAS</b>", section_style))
+    t_habilidades = "TECHNICAL SKILLS" if is_english else "HABILIDADES TÉCNICAS"
+    story.append(Paragraph(f"<b>{t_habilidades}</b>", section_style))
     
     # Monta conjunto factual autorizado
     skills_autorizadas = []
@@ -105,8 +108,11 @@ def gerar_pdf_curriculo(perfil_base: dict, analise_ia: dict, output_filename: st
     story.append(Spacer(1, 10))
 
     # 4. Experiências Profissionais
-    story.append(Paragraph("<b>EXPERIÊNCIA PROFISSIONAL</b>", section_style))
-    for exp in perfil_base.get("experiencias", []):
+    t_experiencia = "PROFESSIONAL EXPERIENCE" if is_english else "EXPERIÊNCIA PROFISSIONAL"
+    story.append(Paragraph(f"<b>{t_experiencia}</b>", section_style))
+    
+    experiencias_fonte = analise_ia.get("experiencias_traduzidas") if is_english and analise_ia.get("experiencias_traduzidas") else perfil_base.get("experiencias", [])
+    for exp in experiencias_fonte:
         carg_exp = html.escape(str(exp.get('cargo', '')))
         emp_exp = html.escape(str(exp.get('empresa', '')))
         per_exp = html.escape(str(exp.get('periodo', '')))
@@ -118,12 +124,16 @@ def gerar_pdf_curriculo(perfil_base: dict, analise_ia: dict, output_filename: st
 
     # 5. Formação Acadêmica
     story.append(Spacer(1, 4))
-    story.append(Paragraph("<b>FORMAÇÃO ACADÊMICA</b>", section_style))
-    for form in perfil_base.get("formacao", []):
+    t_formacao = "EDUCATION" if is_english else "FORMAÇÃO ACADÊMICA"
+    story.append(Paragraph(f"<b>{t_formacao}</b>", section_style))
+    
+    formacao_fonte = analise_ia.get("formacao_traduzida") if is_english and analise_ia.get("formacao_traduzida") else perfil_base.get("formacao", [])
+    for form in formacao_fonte:
         cur_f = html.escape(str(form.get('curso', '')))
         inst_f = html.escape(str(form.get('instituicao', '')))
         conc_f = html.escape(str(form.get('conclusao', '')))
-        form_text = f"<b>{cur_f}</b> - {inst_f} (Conclusão: {conc_f})"
+        lbl_conc = "Graduated: " if is_english else "Conclusão: "
+        form_text = f"<b>{cur_f}</b> - {inst_f} ({lbl_conc}{conc_f})"
         story.append(Paragraph(form_text, body_style))
 
     doc.build(story)

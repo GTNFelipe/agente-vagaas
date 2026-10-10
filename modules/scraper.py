@@ -293,7 +293,10 @@ CARGOS_EXCLUIDOS_REGEX = [
     # Vendas, Comercial, Gestão de Produtos/Projetos, Design
     r'\bcomercial\b', r'\bvendas\b', r'\bvendedor[a]?\b', r'\bsdr\b', r'\bbdr\b',
     r'\bscrum\s*master\b', r'\bagile\s*coach\b', r'\bproduct\s*owner\b', r'\bproduct\s*manager\b',
-    r'\bdesigner\b', r'\bux\b', r'\bui\b'
+    r'\bdesigner\b', r'\bux\b', r'\bui\b',
+    
+    # Estágio e Trainee
+    r'\best[aá]gio\b', r'\bestagi[aá]rio\b', r'\bintern\b', r'\binternship\b', r'\btrainee\b'
 ]
 CARGOS_EXCLUIDOS_COMPILED = [re.compile(p, re.IGNORECASE) for p in CARGOS_EXCLUIDOS_REGEX]
 
@@ -331,8 +334,10 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
     padroes_titulo_dev_analista = [
         r'\bdesenvolvedor[a]?\b', r'\bdeveloper\b', r'\bprogramador[a]?\b', r'\bprogrammer\b',
         r'\bsoftware\s+engineer\b', r'\bengenheiro[a]?\s+de\s+software\b',
-        r'\banalista\b', r'\bautoma[cç][aã]o\b', r'\bn8n\b', r'\btrainee\b',
-        r'\bno\s*-?\s*code\b', r'\blow\s*-?\s*code\b', r'\bvibe\s*code\b'
+        r'\banalista\b', r'\bautoma[cç][aã]o\b', r'\bn8n\b',
+        r'\bno\s*-?\s*code\b', r'\blow\s*-?\s*code\b', r'\bvibe\s*code\b',
+        r'\bfull\s*stack\b', r'\bfullstack\b', r'\bbackend\b', r'\bback\s*-?\s*end\b',
+        r'\bfrontend\b', r'\bfront\s*-?\s*end\b'
     ]
 
     tem_titulo_dev_analista = any(re.search(ptd, titulo, re.IGNORECASE) for ptd in padroes_titulo_dev_analista)
@@ -349,18 +354,21 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
     eh_cobol_mainframe = bool(re.search(r'\b(cobol|mainframe)\b', texto_completo, re.IGNORECASE))
     eh_java = bool(re.search(r'\bjava(?!\s*script)\b', texto_completo, re.IGNORECASE))
     eh_python = bool(re.search(r'\bpython\b', texto_completo, re.IGNORECASE))
-    eh_trainee = bool(re.search(r'\btrainee\b', texto_completo, re.IGNORECASE))
     eh_low_no_code = bool(re.search(r'\b(no\s*-?\s*code|low\s*-?\s*code|vibe\s*code)\b', texto_completo, re.IGNORECASE))
+    eh_fullstack = bool(re.search(r'\bfull\s*stack\b|\bfullstack\b', texto_completo, re.IGNORECASE))
+    eh_backend = bool(re.search(r'\bbackend\b|\bback\s*-?\s*end\b', texto_completo, re.IGNORECASE))
+    eh_frontend = bool(re.search(r'\bfrontend\b|\bfront\s*-?\s*end\b', texto_completo, re.IGNORECASE))
+    eh_react = bool(re.search(r'\breact\b', texto_completo, re.IGNORECASE))
 
     for stack in stacks_incompativeis_titulo:
         if re.search(stack, titulo, re.IGNORECASE) and not (eh_automacao or eh_cobol_mainframe or eh_low_no_code):
             logger.info("[FILTRO STACK INCOMPATÍVEL] Vaga descartada por ser de tecnologia diferente do perfil (%s): '%s'", stack, vaga.get('titulo'))
             return False
 
-    # 5. Identifica se a vaga é de Automação / n8n, COBOL, Mainframe, Java, Python, Trainee, Low-code/No-code ou Analista de Sistemas
+    # 5. Identifica se a vaga é de Automação / n8n, COBOL, Mainframe, Java, Python, Low-code/No-code, Analista, Fullstack, Backend ou Frontend/React
     eh_analista_sistemas = bool(re.search(r'\banalista\s+de\s+sistemas\b', texto_completo, re.IGNORECASE))
 
-    if not (eh_automacao or eh_cobol_mainframe or eh_java or eh_analista_sistemas or eh_python or eh_trainee or eh_low_no_code):
+    if not (eh_automacao or eh_cobol_mainframe or eh_java or eh_analista_sistemas or eh_python or eh_low_no_code or eh_fullstack or eh_backend or eh_frontend or eh_react):
         logger.info("[FILTRO CARGO] Vaga descartada por não ser das tecnologias alvo: '%s'", vaga.get('titulo'))
         return False
 
@@ -372,110 +380,54 @@ def eh_cargo_e_nivel_permitido(vaga: dict) -> bool:
 
     return True
 
-PAISES_ESTRANGEIROS_BLOQUEADOS = [
-    r'\bunited\s+states\b', r'\busa?\b(?!\s*a\b)', r'\bcanada\b', r'\bgermany\b', r'\balemanha\b',
-    r'\bunited\s+kingdom\b', r'\buk\b', r'\bportugal\b', r'\blisboa\b', r'\bporto\b',
-    r'\bspain\b', r'\bespanha\b', r'\bmadrid\b', r'\bnetherlands\b', r'\bamsterdam\b',
-    r'\bpoland\b', r'\bpolonia\b', r'\bindia\b', r'\baustralia\b'
-]
-
-def eh_vaga_no_brasil(vaga: dict) -> bool:
-    """
-    Garante que a vaga seja localizada no Brasil (mesmo que o título ou descrição estejam em inglês).
-    Bloqueia vagas internacionais que exigem moradia/relocação fora do Brasil (EUA, Europa, Canadá, etc.).
-    """
-    link = str(vaga.get("link", "")).lower()
-    titulo = str(vaga.get("titulo", "")).lower()
-    empresa = str(vaga.get("empresa", "")).lower()
-    descricao = str(vaga.get("descricao", "")).lower()
-    texto_completo = f"{link} {titulo} {empresa} {descricao}"
-
-    # 1. Se contiver indicação explícita de Brasil / RJ / LATAM Brazil / Remoto Brasil, aprova!
-    marcas_brasil = [
-        r'\bbrasil\b', r'\bbrazil\b', r'\brj\b', r'\brio\s*de\s*janeiro\b',
-        r'\bremoto\s*brasil\b', r'\bremote\s*\(\s*brazil\s*\)\b', r'\blatam\s*\(\s*brazil\s*\)\b',
-        r'\blatam\b', r'\bsouth\s*america\b', r'\bamérica\s*latina\b'
-    ]
-    for mb in marcas_brasil:
-        if re.search(mb, texto_completo, re.IGNORECASE):
-            return True
-
-    # 2. Se exigir relocalização externa ou moradia/autorização em outro país, rejeita
-    termos_exclusao_exterior = [
-        r'relocat(e|ion)\s+to',
-        r'must\s+be\s+located\s+in\s+the\s+u\.?s\.?',
-        r'us\s+work\s+authorization',
-        r'must\s+reside\s+in\s+europe',
-        r'eu\s+work\s+permit',
-        r'presencial\s+em\s+portugal',
-        r'presencial\s+em\s+madrid'
-    ]
-    for te in termos_exclusao_exterior:
-        if re.search(te, texto_completo, re.IGNORECASE):
-            logger.info("[FILTRO INTERNACIONAL] Vaga descartada por exigir relocalização no exterior: '%s'", vaga.get('titulo'))
-            return False
-
-    # 3. Se mencionar país estrangeiro sem ter menção a Brasil / LATAM
-    for pe in PAISES_ESTRANGEIROS_BLOQUEADOS:
-        if re.search(pe, texto_completo, re.IGNORECASE):
-            logger.info("[FILTRO INTERNACIONAL] Vaga descartada por localização no exterior (%s): '%s'", pe, vaga.get('titulo'))
-            return False
-
-    return True
-
 def eh_vaga_remota_ou_rj(vaga: dict) -> bool:
     """
-    Verifica se a vaga é estritamente:
-    1. 100% Remota (Home Office / Remote em qualquer lugar do Brasil).
-    2. Híbrida ou Presencial localizada ESTRITAMENTE no Rio de Janeiro (RJ).
-    
-    Descarta automaticamente:
-    - Qualquer vaga Presencial fora do Rio de Janeiro.
-    - Qualquer vaga Híbrida fora do Rio de Janeiro (ex: Híbrido SP, Híbrido Barueri, Híbrido BH, etc.).
+    Verifica se a vaga é:
+    1. 100% Remota, em qualquer lugar do mundo.
+    2. Híbrida ou Presencial, ESTRITAMENTE localizada no Rio de Janeiro.
     """
     titulo = str(vaga.get("titulo", "")).lower()
     empresa = str(vaga.get("empresa", "")).lower()
     descricao = str(vaga.get("descricao", "")).lower()
     texto = f"{titulo} {empresa} {descricao}"
 
-    # Regiões fora do Estado do Rio de Janeiro
-    outras_regioes_regex = r'\b(s[aã]o\s*paulo|sp|barueri|alphaville|campinas|santo\s*andr[eé]|s[aã]o\s*bernardo|guarulhos|osasco|sorocaba|s[aã]o\s*jos[eé]|belo\s*horizonte|mg|curitiba|pr|porto\s*alegre|rs|florian[oó]polis|sc|blumenau|bras[íi]lia|df|salvador|ba|recife|pe|fortaleza|ce|goi[aâ]nia|go)\b'
-
-    # Marcas do Rio de Janeiro (RJ)
-    marcas_rj_regex = r'\b(rio\s*de\s*janeiro|rj|barra\s*da\s*tijuca|centro\s*-\s*rj|botafogo|niter[oó]i|tijuca|duque\s*de\s*caxias|niterói)\b'
-
-    # Modalidades
     eh_hibrido = bool(re.search(r'\b(h[ií]brid[oa]|hybrid|hibrida)\b', texto))
-    eh_presencial = bool(re.search(r'\b(presencial|on-site|onsite|no\s+escrit[oó]rio)\b', texto))
+    eh_presencial = bool(re.search(r'\b(presencial|on-site|onsite|no\s+escrit[oó]rio|in\s*office)\b', texto))
     eh_remoto_100 = bool(re.search(r'\b(100%\s*remoto|remoto\s*brasil|totalmente\s*remoto|remota|remote|home\s*office|teletrabalho|work\s*from\s*home|anywhere)\b', texto))
+
+    # Regiões do Rio
+    marcas_rj_regex = r'\b(rio\s*de\s*janeiro|rj|barra\s*da\s*tijuca|centro\s*-\s*rj|botafogo|niter[oó]i|tijuca|duque\s*de\s*caxias|niterói)\b'
     tem_marca_rj = bool(re.search(marcas_rj_regex, texto))
+    outras_regioes_regex = r'\b(s[aã]o\s*paulo|sp|barueri|alphaville|campinas|santo\s*andr[eé]|s[aã]o\s*bernardo|guarulhos|osasco|sorocaba|s[aã]o\s*jos[eé]|belo\s*horizonte|mg|curitiba|pr|porto\s*alegre|rs|florian[oó]polis|sc|blumenau|bras[íi]lia|df|salvador|ba|recife|pe|fortaleza|ce|goi[aâ]nia|go)\b'
     tem_outra_regiao = bool(re.search(outras_regioes_regex, texto))
-
-    # 1. Se for vaga Híbrida ou Presencial em outra região (fora do RJ) -> REJEITA IMEDIATAMENTE
-    if (eh_hibrido or eh_presencial) and tem_outra_regiao and not tem_marca_rj:
-        logger.info("[FILTRO LOCALIDADE] Vaga Híbrida/Presencial descartada por ser fora do RJ: '%s' (%s)", vaga.get('titulo'), vaga.get('empresa'))
+    
+    # Se for Híbrida ou Presencial, e não tiver menção ao RJ (ou tiver de outra região), descarta
+    if (eh_hibrido or eh_presencial) and not tem_marca_rj:
+        logger.info("[FILTRO LOCALIDADE] Vaga Híbrida/Presencial descartada (Fora do RJ): '%s' (%s)", vaga.get('titulo'), vaga.get('empresa'))
         return False
 
-    # 2. Se for Presencial sem ser no RJ -> REJEITA
-    if eh_presencial and not tem_marca_rj:
-        logger.info("[FILTRO LOCALIDADE] Vaga Presencial descartada por não ser no RJ: '%s' (%s)", vaga.get('titulo'), vaga.get('empresa'))
-        return False
+    # Validação de bloqueio de imigração para vagas gringas
+    termos_exclusao_exterior = [
+        r'relocat(e|ion)\s+to',
+        r'must\s+be\s+located\s+in\s+the\s+u\.?s\.?',
+        r'us\s+work\s+authorization',
+        r'must\s+reside\s+in\s+europe',
+        r'eu\s+work\s+permit',
+        r'right\s+to\s+work\s+in\s+the\s+uk',
+        r'right\s+to\s+work\s+in\s+the\s+us'
+    ]
+    for te in termos_exclusao_exterior:
+        if re.search(te, texto, re.IGNORECASE):
+            logger.info("[FILTRO INTERNACIONAL LIMITADO] Vaga descartada por exigir moradia/autorização no exterior: '%s'", vaga.get('titulo'))
+            return False
 
-    # 3. Se for Híbrida sem ser no RJ -> REJEITA
-    if eh_hibrido and not tem_marca_rj:
-        logger.info("[FILTRO LOCALIDADE] Vaga Híbrida descartada por não ser no RJ: '%s' (%s)", vaga.get('titulo'), vaga.get('empresa'))
-        return False
-
-    # 4. Se for Remota 100% -> APROVA
     if eh_remoto_100 and not (eh_hibrido and tem_outra_regiao):
         return True
-
-    # 5. Se for no Rio de Janeiro (RJ) -> APROVA
-    if tem_marca_rj:
+        
+    if tem_marca_rj and (eh_hibrido or eh_presencial):
         return True
 
-    # Se não for 100% remota nem no RJ -> REJEITA por segurança
-    logger.info("[FILTRO LOCALIDADE] Vaga descartada por não ser 100%% Remota nem no RJ: '%s' (%s)", vaga.get('titulo'), vaga.get('empresa'))
+    logger.info("[FILTRO LOCALIDADE] Vaga descartada por não ser Remota nem estar no RJ: '%s' (%s)", vaga.get('titulo'), vaga.get('empresa'))
     return False
 
 TERMOS_EXCLUSIVOS_GRUPO_REGEX = [
@@ -686,14 +638,14 @@ def executar_varredura_completa(cargos_alvo: list = None):
     
     # Buscas direcionadas no Google Jobs por categoria/tecnologia
     queries_google = [
-        "Desenvolvedor Java Junior Brasil",
-        "Desenvolvedor Python Junior Brasil",
-        "Analista de Sistemas Junior Brasil",
-        "Desenvolvedor COBOL Mainframe Brasil",
-        "Analista COBOL Mainframe Brasil",
-        "Trainee TI Brasil",
-        "n8n automacao Brasil",
-        "low code no code Brasil"
+        "Desenvolvedor Backend Junior Remote",
+        "Desenvolvedor Fullstack Junior Remote",
+        "Desenvolvedor Frontend Junior React Remote",
+        "Desenvolvedor COBOL Mainframe Junior Remote",
+        "Analista COBOL Mainframe Junior Remote",
+        "Analista de Sistemas Junior Remote",
+        "Analista de Automação n8n Junior Remote",
+        "Desenvolvedor Low code No code Junior Remote"
     ]
 
     permitido_serp, buscas_hoje, limite_diario_serp = pode_executar_busca_serpapi_hoje()
@@ -713,14 +665,14 @@ def executar_varredura_completa(cargos_alvo: list = None):
     logger.info("[BUSCA LINKEDIN] Varrendo LinkedIn (Portal Público / Sem consumo de cota)...")
     vagas_linkedin = []
     queries_linkedin = [
-        "Desenvolvedor Java Junior",
-        "Desenvolvedor Python Junior",
+        "Desenvolvedor Backend Junior",
+        "Desenvolvedor Fullstack Junior",
+        "Desenvolvedor Frontend Junior React",
+        "Desenvolvedor COBOL Mainframe Junior",
+        "Analista COBOL Mainframe Junior",
         "Analista de Sistemas Junior",
-        "Desenvolvedor COBOL Mainframe",
-        "Analista COBOL Mainframe",
-        "Trainee TI",
-        "n8n automacao",
-        "low code no code"
+        "Analista de Automação n8n Junior",
+        "Desenvolvedor Low code No code Junior"
     ]
     for q in queries_linkedin:
         vl = buscar_vagas_linkedin_publico(keywords=q, location="Brasil")
@@ -744,13 +696,10 @@ def executar_varredura_completa(cargos_alvo: list = None):
         if eh_cargo_e_nivel_permitido(vaga):
             if eh_vaga_publico_geral(vaga):
                 if eh_candidatura_gratuita(vaga):
-                    if eh_vaga_no_brasil(vaga):
-                        if eh_vaga_remota_ou_rj(vaga):
-                            vagas_filtradas.append(vaga)
-                        else:
-                            logger.info("[FILTRO LOCALIDADE] Vaga descartada (Presencial/Híbrida fora do RJ): '%s'", vaga.get('titulo'))
+                    if eh_vaga_remota_ou_rj(vaga):
+                        vagas_filtradas.append(vaga)
                     else:
-                        logger.info("[FILTRO PAÍS] Vaga descartada por ser localizada fora do Brasil: '%s'", vaga.get('titulo'))
+                        logger.info("[FILTRO LOCALIDADE] Vaga descartada (Não é Remota nem está no RJ): '%s'", vaga.get('titulo'))
 
     logger.info("[SUCESSO] Total de vagas filtradas (Brasil, Gratuitas, Remoto/RJ): %s", len(vagas_filtradas))
     return vagas_filtradas

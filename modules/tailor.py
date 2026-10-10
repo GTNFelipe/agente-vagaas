@@ -64,6 +64,7 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
     8. Identifique a tecnologia ou competência principal da vaga (tecnologia_principal), ex: "Python", "Java", "COBOL", "Analista".
     9. Identifique o Nome do Recrutador ou da pessoa que postou a vaga (nome_recrutador). Se não identificar, retorne vazio "".
     10. Identifique o gênero do recrutador com base no nome (genero_recrutador). Retorne "M" para masculino, "F" para feminino, ou "N/A" se não for possível identificar ou não houver nome.
+    11. DETECÇÃO DE IDIOMA E LOCALIDADE: Verifique se a <descricao_vaga> está em INGLÊS e se a vaga é fora do Brasil (ou remota internacional). Se AMBAS as condições forem verdadeiras: defina "is_english": true e traduza para o inglês TODO o conteúdo gerado (resumo_adaptado, cover_letter, dossie_entrevista, habilidades_destacadas), além de traduzir as experiências e formações do perfil base preenchendo as chaves "experiencias_traduzidas" e "formacao_traduzida". Caso contrário, defina "is_english": false e deixe as chaves de tradução vazias, gerando tudo em Português.
 
     RETORNE ESTRITAMENTE UM JSON NO SEGUINTE FORMATO (Sem markdown em volta ou texto extra):
     {{
@@ -73,8 +74,11 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict) -> dict:
         "nome_recrutador": "Nome do recrutador ou vazio",
         "genero_recrutador": "M, F, ou N/A",
         "tecnologia_principal": "Tecnologia Principal",
+        "is_english": false,
         "resumo_adaptado": "Resumo profissional 100% verdadeiro customizado a favor da vaga com base no perfil factual",
         "habilidades_destacadas": ["Skill Real 1", "Skill Real 2", "Skill Real 3"],
+        "experiencias_traduzidas": [{"empresa": "...", "cargo": "...", "periodo": "...", "detalhes": ["..."]}],
+        "formacao_traduzida": [{"curso": "...", "instituicao": "...", "conclusao": "..."}],
         "cover_letter": "Texto completo da carta de apresentação para o recrutador",
         "dossie_entrevista": {{
             "pontos_fortes": ["Ponto 1", "Ponto 2", "Ponto 3"],
