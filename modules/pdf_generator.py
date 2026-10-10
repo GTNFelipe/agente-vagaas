@@ -1,15 +1,15 @@
-import os
 import html
 import logging
-from typing import Dict, Any, List
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from typing import Any
+
 from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-def gerar_pdf_curriculo(perfil_base: Dict[str, Any], analise_ia: Dict[str, Any], output_filename: str = "curriculo_otimizado.pdf") -> str:
+def gerar_pdf_curriculo(perfil_base: dict[str, Any], analise_ia: dict[str, Any], output_filename: str = "curriculo_otimizado.pdf") -> str:
     """
     Gera um PDF formatado e limpo para ATS com base no perfil adaptado pela IA.
     """

@@ -1,10 +1,11 @@
 import json
-import os
-import sys
-import re
-import time
 import logging
-from typing import Dict, Any, List, Optional
+import os
+import re
+import sys
+import time
+from typing import Any
+
 from dotenv import load_dotenv
 
 logging.basicConfig(
@@ -19,24 +20,32 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-from modules.scraper import coletar_vagas_todas_fontes, vaga_ainda_ativa, extrair_email_profundo
-from modules.tailor import adaptar_curriculo
-from modules.pdf_generator import gerar_pdf_curriculo
-from modules.dossier import gerar_dossie_vaga
 from modules.cover_letter import gerar_arquivo_carta_apresentacao
 from modules.database import (
     inicializar_supabase,
-    vaga_ja_processada,
+    salvar_curriculo_gerado,
+    salvar_dossie_entrevista,
     salvar_vaga_base,
     salvar_vaga_processada,
-    salvar_curriculo_gerado,
-    salvar_dossie_entrevista
+    vaga_ja_processada,
 )
-from modules.notifier import realizar_candidatura_auto_email, enviar_notificacao_vaga, notificar_resumo_varredura
+from modules.dossier import gerar_dossie_vaga
+from modules.notifier import (
+    enviar_notificacao_vaga,
+    notificar_resumo_varredura,
+    realizar_candidatura_auto_email,
+)
+from modules.pdf_generator import gerar_pdf_curriculo
+from modules.scraper import (
+    coletar_vagas_todas_fontes,
+    extrair_email_profundo,
+    vaga_ainda_ativa,
+)
+from modules.tailor import adaptar_curriculo
 
 load_dotenv()
 
-def carregar_perfil_base() -> Dict[str, Any]:
+def carregar_perfil_base() -> dict[str, Any]:
     if os.environ.get("MASTER_PROFILE_JSON"):
         perfil_env = json.loads(os.environ["MASTER_PROFILE_JSON"])
         if not isinstance(perfil_env, dict):
@@ -52,21 +61,21 @@ def carregar_perfil_base() -> Dict[str, Any]:
             
     raise FileNotFoundError("Perfil mestre não encontrado. Defina a variável MASTER_PROFILE_JSON ou crie o arquivo master_profile.json.")
 
-def extrair_email_texto(texto: Optional[str]) -> Optional[str]:
+def extrair_email_texto(texto: str | None) -> str | None:
     if not texto:
         return None
-    emails: List[str] = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', texto)
+    emails: list[str] = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', texto)
     return emails[0] if emails else None
 
-def main(manual: bool = False, target_chat_id: Optional[str] = None) -> None:
+def main(manual: bool = False, target_chat_id: str | None = None) -> None:
     logger.info("[INICIO] Executando Agente de Vagas & Candidatura Autonoma (Fase 3)...")
     
-    perfil_base: Dict[str, Any] = carregar_perfil_base()
-    cargos_alvo: List[str] = perfil_base.get("cargos_alvo", ["Desenvolvedor COBOL", "Desenvolvedor Java Junior"])
+    perfil_base: dict[str, Any] = carregar_perfil_base()
+    cargos_alvo: list[str] = perfil_base.get("cargos_alvo", ["Desenvolvedor COBOL", "Desenvolvedor Java Junior"])
     supabase_client: Any = inicializar_supabase()
 
     # 1. Coleta Vagas na Web
-    vagas_encontradas: List[Dict[str, Any]] = coletar_vagas_todas_fontes(cargos_alvo)
+    vagas_encontradas: list[dict[str, Any]] = coletar_vagas_todas_fontes(cargos_alvo)
 
     if not vagas_encontradas:
         logger.info("Nenhuma vaga encontrada nesta rodada.")
@@ -85,7 +94,7 @@ def main(manual: bool = False, target_chat_id: Optional[str] = None) -> None:
             logger.warning("[WARNING] Estrutura de vaga ignorada por nao ser dicionario.")
             continue
             
-        link: Optional[str] = vaga.get("link")
+        link: str | None = vaga.get("link")
         titulo: str = str(vaga.get("titulo", "Titulo Desconhecido"))
         empresa: str = str(vaga.get("empresa", "Empresa Desconhecida"))
 
@@ -104,7 +113,7 @@ def main(manual: bool = False, target_chat_id: Optional[str] = None) -> None:
         logger.info("\n[VAGA] Analisando: %s - %s", titulo, empresa)
         
         descricao_segura: str = str(vaga.get("descricao", titulo))
-        analise: Dict[str, Any] = adaptar_curriculo(descricao_segura, perfil_base)
+        analise: dict[str, Any] = adaptar_curriculo(descricao_segura, perfil_base)
         match_score: int = int(analise.get("match_score", 0))
         logger.info("[SCORE] Score de Match: %s%%", match_score)
 

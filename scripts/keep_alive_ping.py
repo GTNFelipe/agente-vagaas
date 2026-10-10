@@ -1,8 +1,9 @@
 import os
-import sys
-import time
 import socket
 import subprocess
+import sys
+import time
+
 import requests
 from dotenv import load_dotenv
 
@@ -31,7 +32,7 @@ def bot_esta_rodando(port: int = PORT_LOCK) -> bool:
         sock.bind(("127.0.0.1", port))
         sock.close()
         return False  # Porta livre = bot NÃO está rodando
-    except socket.error:
+    except OSError:
         return True   # Porta ocupada = bot ESTÁ rodando com sucesso
 
 def disparar_ping_keepalive():
@@ -39,7 +40,7 @@ def disparar_ping_keepalive():
     Monitora a cada 5 minutos (300 segundos).
     Testa a saúde da API do Telegram e se o bot caiu, relança-o automaticamente.
     """
-    print(f"🔄 [PING KEEPALIVE 24/7] Monitorando o Agente de Vagas a cada 5 minutos (300s)...")
+    print("🔄 [PING KEEPALIVE 24/7] Monitorando o Agente de Vagas a cada 5 minutos (300s)...")
     
     while True:
         agora_str = time.strftime("%d/%m/%Y às %H:%M:%S")

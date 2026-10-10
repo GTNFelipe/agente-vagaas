@@ -1,6 +1,7 @@
 import os
-import pytest
+
 from modules.pdf_generator import gerar_pdf_curriculo
+
 
 def test_gerar_pdf_curriculo(tmp_path):
     perfil_base = {

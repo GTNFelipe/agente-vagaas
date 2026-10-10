@@ -1,17 +1,18 @@
-import os
-import sys
-import time
-import socket
-import threading
-import re
+import base64
 import ctypes
 import html
-import requests
 import logging
-import base64
+import os
+import re
+import socket
+import sys
+import threading
+import time
+from typing import Any
+
+import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from typing import Dict, Any, List, Optional
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def garantir_instancia_unica(port: int = 47891):
     try:
         sock.bind(("127.0.0.1", port))
         return sock
-    except socket.error:
+    except OSError:
         logger.warning("[BOT LOCK] Outra instância do bot já está rodando (Porta %s). Encerrando duplicata.", port)
         sys.exit(0)
 
@@ -76,19 +77,21 @@ if os.path.exists(ENV_FILE):
 else:
     load_dotenv()
 
+from datetime import UTC
+
+import main
+from modules.cover_letter import gerar_arquivo_carta_apresentacao
 from modules.database import (
     inicializar_supabase,
-    salvar_vaga_base,
     salvar_curriculo_gerado,
     salvar_dossie_entrevista,
-    salvar_vaga_processada
+    salvar_vaga_base,
+    salvar_vaga_processada,
 )
-from modules.tailor import adaptar_curriculo
-from modules.pdf_generator import gerar_pdf_curriculo
 from modules.dossier import gerar_dossie_vaga
-from modules.cover_letter import gerar_arquivo_carta_apresentacao
 from modules.notifier import enviar_notificacao_vaga, realizar_candidatura_auto_email
-import main
+from modules.pdf_generator import gerar_pdf_curriculo
+from modules.tailor import adaptar_curriculo
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -104,7 +107,7 @@ def enviar_mensagem_telegram(chat_id: str, texto: str) -> None:
         return
         
     url: str = f"{API_URL}/sendMessage"
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "chat_id": chat_id,
         "text": texto,
         "parse_mode": "HTML",
@@ -115,7 +118,7 @@ def enviar_mensagem_telegram(chat_id: str, texto: str) -> None:
     except Exception as e:
         logger.warning("[ERRO TELEGRAM] Falha ao enviar mensagem: %s", e)
 
-def consultar_uso_serpapi() -> Dict[str, Any]:
+def consultar_uso_serpapi() -> dict[str, Any]:
     """Consulta os dados reais de uso da API SerpAPI diretamente na API oficial (consolida todas as chaves configuradas)."""
     raw_keys = os.getenv("SERPAPI_KEYS") or os.getenv("SERPAPI_KEY") or ""
     chaves = [k.strip() for k in re.split(r"[,;\s]+", raw_keys) if k.strip()]
@@ -159,7 +162,7 @@ def extrair_texto_url(url: str) -> str:
         raise ValueError("[FAIL FAST] URL fornecida para extração de texto é inválida.")
         
     try:
-        headers: Dict[str, str] = {
+        headers: dict[str, str] = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
         resp: requests.Response = requests.get(url, headers=headers, timeout=15)
@@ -184,8 +187,9 @@ def extrair_texto_imagem_groq(image_path: str) -> str:
         from groq import Groq
         client = Groq(api_key=api_key)
         
-        from PIL import Image
         import io
+
+        from PIL import Image
         
         # Otimizar a imagem para evitar limites de resolução da API Groq
         with Image.open(image_path) as img:
@@ -317,7 +321,7 @@ def comando_buscar(chat_id: str):
 
 def gerar_relatorio_diario_telegram(automatico: bool = False) -> str:
     """Gera o resumo diário de desempenho (Daily Digest) consultando o Supabase e com fallback local."""
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
     
     # Define Horário de Brasília (UTC-3)
     fuso_brt = timezone(timedelta(hours=-3))
@@ -326,7 +330,7 @@ def gerar_relatorio_diario_telegram(automatico: bool = False) -> str:
 
     # Calcula o início do dia no Horário de Brasília convertido para UTC (para consulta no Supabase)
     inicio_dia_brt = agora_brt.replace(hour=0, minute=0, second=0, microsecond=0)
-    inicio_utc_str = inicio_dia_brt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    inicio_utc_str = inicio_dia_brt.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
     total_proc_hoje = 0
     qualificadas_hoje = 0

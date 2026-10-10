@@ -1,12 +1,12 @@
+import logging
 import os
 import re
-import logging
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Any
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-def gerar_dossie_vaga(vaga_info: Dict[str, Any], analise_ia: Dict[str, Any], output_dir: str = "dossies_vagas") -> str:
+def gerar_dossie_vaga(vaga_info: dict[str, Any], analise_ia: dict[str, Any], output_dir: str = "dossies_vagas") -> str:
     """
     Gera um Dossiê completo de Preparação para Entrevista em formato Markdown (.md)
     com base nas análises e insights da IA sobre a vaga.

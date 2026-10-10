@@ -1,12 +1,12 @@
+import logging
 import os
 import re
-import logging
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-def gerar_arquivo_carta_apresentacao(vaga_info: Dict[str, Any], analise_ia: Dict[str, Any], perfil_base: Dict[str, Any], output_dir: str = "cartas_apresentacao") -> str:
+def gerar_arquivo_carta_apresentacao(vaga_info: dict[str, Any], analise_ia: dict[str, Any], perfil_base: dict[str, Any], output_dir: str = "cartas_apresentacao") -> str:
     """
     Gera um arquivo formatado (.txt / .md) da Carta de Apresentação de Alto Impacto para a vaga.
     """

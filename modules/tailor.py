@@ -1,11 +1,11 @@
-import os
 import json
 import logging
+import os
 import time
-from typing import Dict, Any, List, Set, Optional
+from typing import Any
 
 try:
-    from groq import Groq, RateLimitError, GroqError
+    from groq import Groq, GroqError, RateLimitError
 except ImportError:
     Groq = None
     RateLimitError = Exception
@@ -18,7 +18,7 @@ MAX_RETRIES: int = 3
 BASE_WAIT_TIME_SECONDS: int = 15
 DEFAULT_MODEL: str = "openai/gpt-oss-120b"
 
-def adaptar_curriculo(descricao_vaga: str, perfil_json: Dict[str, Any]) -> Dict[str, Any]:
+def adaptar_curriculo(descricao_vaga: str, perfil_json: dict[str, Any]) -> dict[str, Any]:
     """
     Usa a API da Groq para analisar a vaga e adequar o perfil profissional base, gerando também a cover letter.
     """
@@ -28,7 +28,7 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: Dict[str, Any]) -> Dict[
     if not perfil_json or not isinstance(perfil_json, dict):
         raise ValueError("[FAIL FAST] O perfil JSON base não pode estar vazio ou ser inválido.")
         
-    api_key: Optional[str] = os.getenv("GROQ_API_KEY")
+    api_key: str | None = os.getenv("GROQ_API_KEY")
     
     if not api_key:
         logger.warning("[AVISO] GROQ_API_KEY nao foi definida. Usando resposta fallback para execucao local de testes.")
@@ -110,8 +110,8 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: Dict[str, Any]) -> Dict[
     tempo_espera: int = BASE_WAIT_TIME_SECONDS
 
     # Monta a lista completa de skills factuais do perfil mestre para validação
-    skills_factuais: Set[str] = set()
-    hab_dict: Dict[str, Any] = perfil_json.get("habilidades_tecnicas", {})
+    skills_factuais: set[str] = set()
+    hab_dict: dict[str, Any] = perfil_json.get("habilidades_tecnicas", {})
     for cat in hab_dict.values():
         if isinstance(cat, list):
             for item in cat:
@@ -123,7 +123,7 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: Dict[str, Any]) -> Dict[
             skills_factuais.add(str(tech).lower().strip())
 
     model_env: str = str(os.getenv("GROQ_MODEL", DEFAULT_MODEL))
-    modelos_candidatos: List[str] = [
+    modelos_candidatos: list[str] = [
         model_env,
         "openai/gpt-oss-120b",
         "openai/gpt-oss-20b",
@@ -132,7 +132,7 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: Dict[str, Any]) -> Dict[
         "qwen/qwen3.6-27b",
     ]
     
-    modelos_para_testar: List[str] = []
+    modelos_para_testar: list[str] = []
     for m in modelos_candidatos:
         if m and m not in modelos_para_testar:
             modelos_para_testar.append(m)
@@ -150,8 +150,7 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: Dict[str, Any]) -> Dict[
                 raw_content = response.choices[0].message.content.strip()
                 if raw_content.startswith("```"):
                     raw_content = raw_content.split("```")[1]
-                    if raw_content.startswith("json"):
-                        raw_content = raw_content[4:]
+                    raw_content = raw_content.removeprefix("json")
                     raw_content = raw_content.strip()
 
                 resultado = json.loads(raw_content)
@@ -196,7 +195,7 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: Dict[str, Any]) -> Dict[
                     continue
                 raise ValueError(f"Falha critica ao conectar com API LLM: {e}") from e
 
-def _fallback_adaptacao(perfil_json: Dict[str, Any], descricao_vaga: str) -> Dict[str, Any]:
+def _fallback_adaptacao(perfil_json: dict[str, Any], descricao_vaga: str) -> dict[str, Any]:
     """Retorna uma estrutura fallback para execução de teste local sem a chave Groq."""
     return {
         "match_score": 85,

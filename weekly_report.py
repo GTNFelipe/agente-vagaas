@@ -1,9 +1,12 @@
 import os
 import smtplib
-from typing import Dict, Any, List, Optional
+from datetime import UTC
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Any
+
 from dotenv import load_dotenv
+
 from modules.database import inicializar_supabase
 
 load_dotenv()
@@ -15,17 +18,17 @@ def gerar_relatorio_semanal() -> None:
         return
 
     try:
-        from datetime import datetime, timezone, timedelta
-        sete_dias_atras: str = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        from datetime import datetime, timedelta
+        sete_dias_atras: str = (datetime.now(UTC) - timedelta(days=7)).isoformat()
         res: Any = supabase.table("vagas_processadas").select("*").gte("created_at", sete_dias_atras).execute()
-        dados: List[Dict[str, Any]] = res.data or []
+        dados: list[dict[str, Any]] = res.data or []
 
         total_vagas: int = len(dados)
         candidatadas_auto: int = len([v for v in dados if v.get("status_candidatura") == "candidatado_auto"])
         alertas_manuais: int = len([v for v in dados if v.get("status_candidatura") == "alerta_manual"])
         descartadas: int = len([v for v in dados if v.get("status_candidatura") == "descartado"])
         
-        scores: List[float] = [float(v.get("match_score", 0)) for v in dados if v.get("match_score")]
+        scores: list[float] = [float(v.get("match_score", 0)) for v in dados if v.get("match_score")]
         media_score: float = round(sum(scores) / len(scores), 1) if scores else 0.0
 
         remetente = os.getenv("GMAIL_USER")
@@ -63,7 +66,7 @@ def gerar_relatorio_semanal() -> None:
 
         # Notifica no Telegram
         try:
-            from modules.telegram_bot import enviar_mensagem_telegram, TELEGRAM_CHAT_ID
+            from modules.telegram_bot import TELEGRAM_CHAT_ID, enviar_mensagem_telegram
             msg_telegram = f"""📈 <b>[RELATÓRIO SEMANAL DE ANALYTICS]</b>
 
 📊 <b>Desempenho Geral do Agente de Vagas:</b>

@@ -1,24 +1,25 @@
-import os
 import json
-import re
 import logging
+import os
+import re
 from datetime import datetime
-from typing import Optional, Any, Dict, List
+from typing import Any
+
 from dotenv import load_dotenv
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 try:
-    from supabase import create_client, Client
+    from supabase import Client, create_client
 except ImportError:
     Client = None
     create_client = None
 
 LOCAL_DB_FILE = "vagas_processadas.json"
 
-_SUPABASE_INSTANCE: Optional[Client] = None
+_SUPABASE_INSTANCE: Client | None = None
 
-def inicializar_supabase() -> Optional[Client]:
+def inicializar_supabase() -> Client | None:
     global _SUPABASE_INSTANCE
     if _SUPABASE_INSTANCE is not None:
         return _SUPABASE_INSTANCE
@@ -46,11 +47,11 @@ def inicializar_supabase() -> Optional[Client]:
     try:
         _SUPABASE_INSTANCE = create_client(url, key)
         return _SUPABASE_INSTANCE
-    except Exception as e:
+    except Exception:
         logger.exception("Falha ao conectar no Supabase")
         return None
 
-def _carregar_vagas_locais() -> List[Dict[str, Any]]:
+def _carregar_vagas_locais() -> list[dict[str, Any]]:
     if os.path.exists(LOCAL_DB_FILE):
         try:
             with open(LOCAL_DB_FILE, "r", encoding="utf-8") as f:
@@ -63,7 +64,7 @@ def _carregar_vagas_locais() -> List[Dict[str, Any]]:
             return []
     return []
 
-def _salvar_vagas_locais(vagas: List[Dict[str, Any]]) -> None:
+def _salvar_vagas_locais(vagas: list[dict[str, Any]]) -> None:
     if not isinstance(vagas, list):
         raise ValueError("[FAIL FAST] A variavel vagas deve ser uma lista.")
     try:
@@ -84,7 +85,7 @@ def _normalizar_url(url: str) -> str:
     url = url.split("?")[0].rstrip("/")
     return url.lower().strip()
 
-def vaga_ja_processada(supabase: Optional[Client], vaga_or_link: Any) -> bool:
+def vaga_ja_processada(supabase: Client | None, vaga_or_link: Any) -> bool:
     """
     Verifica se a vaga já foi registrada ou candidatada anteriormente.
     Consulta tanto o arquivo local (vagas_processadas.json) quanto o Supabase.
@@ -138,12 +139,12 @@ def vaga_ja_processada(supabase: Optional[Client], vaga_or_link: Any) -> bool:
                 res_vagas = supabase.table("vagas").select("id").ilike("titulo", titulo.strip()).execute()
                 if res_vagas.data and len(res_vagas.data) > 0:
                     return True
-        except Exception as e:
+        except Exception:
             logger.exception("Erro ao verificar duplicata no Supabase")
 
     return False
 
-def salvar_vaga_base(supabase: Optional[Client], vaga_data: dict, match_score: int, status: str = "ENCONTRADA") -> Optional[str]:
+def salvar_vaga_base(supabase: Client | None, vaga_data: dict, match_score: int, status: str = "ENCONTRADA") -> str | None:
     """
     Registra a vaga na tabela 'vagas' do Supabase e retorna o ID UUID gerado.
     """
@@ -165,7 +166,7 @@ def salvar_vaga_base(supabase: Optional[Client], vaga_data: dict, match_score: i
             vaga_id = res.data[0].get("id")
             logger.info("Vaga salva na tabela 'vagas' Supabase (ID: %s)!", vaga_id)
             return vaga_id
-    except Exception as e:
+    except Exception:
         logger.exception("Erro ao salvar na tabela 'vagas'")
         try:
             if vaga_data.get("link"):
@@ -178,7 +179,7 @@ def salvar_vaga_base(supabase: Optional[Client], vaga_data: dict, match_score: i
             pass
     return None
 
-def salvar_vaga_processada(supabase: Optional[Client], vaga_data: dict, analise_ia: dict, status_candidatura: str = "alerta_manual") -> Optional[str]:
+def salvar_vaga_processada(supabase: Client | None, vaga_data: dict, analise_ia: dict, status_candidatura: str = "alerta_manual") -> str | None:
     """
     Registra o histórico da análise na tabela 'vagas_processadas' do Supabase.
     """
@@ -221,13 +222,13 @@ def salvar_vaga_processada(supabase: Optional[Client], vaga_data: dict, analise_
             logger.info("Vaga '%s' salva em 'vagas_processadas' Supabase!", vaga_data.get('titulo'))
             if res.data and len(res.data) > 0:
                 return res.data[0].get("id")
-        except Exception as e:
+        except Exception:
             logger.exception("Erro ao salvar em 'vagas_processadas'")
     else:
         logger.info("Supabase nao conectado. Vaga '%s' registrada localmente em 'vagas_processadas.json'.", vaga_data.get('titulo'))
     return None
 
-def salvar_curriculo_gerado(supabase: Optional[Client], vaga_id: Optional[str], pdf_path: str, analise_ia: dict) -> Optional[str]:
+def salvar_curriculo_gerado(supabase: Client | None, vaga_id: str | None, pdf_path: str, analise_ia: dict) -> str | None:
     """
     Registra o currículo otimizado na tabela 'curriculos_gerados' do Supabase.
     """
@@ -246,11 +247,11 @@ def salvar_curriculo_gerado(supabase: Optional[Client], vaga_id: Optional[str], 
             cg_id = res.data[0].get("id")
             logger.info("Currículo registrado na tabela 'curriculos_gerados' Supabase (ID: %s)!", cg_id)
             return cg_id
-    except Exception as e:
+    except Exception:
         logger.exception("Erro ao salvar em 'curriculos_gerados'")
     return None
 
-def salvar_dossie_entrevista(supabase: Optional[Client], vaga_id: Optional[str], analise_ia: dict) -> Optional[str]:
+def salvar_dossie_entrevista(supabase: Client | None, vaga_id: str | None, analise_ia: dict) -> str | None:
     """
     Registra o dossiê de entrevista na tabela 'prep_dossies' do Supabase.
     """
@@ -272,6 +273,6 @@ def salvar_dossie_entrevista(supabase: Optional[Client], vaga_id: Optional[str],
             pd_id = res.data[0].get("id")
             logger.info("Dossiê registrado na tabela 'prep_dossies' Supabase (ID: %s)!", pd_id)
             return pd_id
-    except Exception as e:
+    except Exception:
         logger.exception("Erro ao salvar em 'prep_dossies'")
     return None

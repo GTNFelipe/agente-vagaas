@@ -1,12 +1,13 @@
-import os
-import sys
-import re
 import json
 import logging
-import requests
+import os
+import re
+import sys
 from datetime import datetime
+from typing import Any
+
+import requests
 from bs4 import BeautifulSoup
-from typing import Dict, Any, List, Optional, Tuple
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -308,7 +309,7 @@ SENIORIDADE_ALTA_REGEX = [
 ]
 SENIORIDADE_ALTA_COMPILED = [re.compile(p, re.IGNORECASE) for p in SENIORIDADE_ALTA_REGEX]
 
-def eh_cargo_e_nivel_permitido(vaga: Dict[str, Any]) -> bool:
+def eh_cargo_e_nivel_permitido(vaga: dict[str, Any]) -> bool:
     """
     Filtra estritamente para garantir que a vaga seja de Desenvolvedor ou Analista de Sistemas/Automação:
     - COBOL, Mainframe, Analista de Sistemas e Java: APENAS nível JÚNIOR / TRAINEE.
@@ -384,7 +385,7 @@ def eh_cargo_e_nivel_permitido(vaga: Dict[str, Any]) -> bool:
 
     return True
 
-def eh_vaga_remota_ou_rj(vaga: Dict[str, Any]) -> bool:
+def eh_vaga_remota_ou_rj(vaga: dict[str, Any]) -> bool:
     """
     Verifica se a vaga é:
     1. 100% Remota, em qualquer lugar do mundo.
@@ -636,15 +637,15 @@ def buscar_vagas_linkedin_publico(keywords: str, location: str = "Brasil") -> li
 
     return vagas
 
-def executar_varredura_completa(cargos_alvo: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+def executar_varredura_completa(cargos_alvo: list[str] | None = None) -> list[dict[str, Any]]:
     """
     Orquestra a varredura multicanal em todas as fontes (Google Jobs via SerpAPI, LinkedIn Público, Programathor, Fóruns GitHub e RSS).
     Utiliza pesquisas direcionadas por cargo alvo para garantir máximo rendimento de vagas.
     """
-    todas_vagas: List[Dict[str, Any]] = []
+    todas_vagas: list[dict[str, Any]] = []
     
     # Buscas direcionadas no Google Jobs por categoria/tecnologia
-    queries_google: List[str] = [
+    queries_google: list[str] = [
         "Desenvolvedor Backend Junior Remote",
         "Desenvolvedor Fullstack Junior Remote",
         "Desenvolvedor Frontend Junior React Remote",

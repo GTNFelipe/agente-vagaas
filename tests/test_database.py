@@ -1,6 +1,7 @@
-import pytest
 from unittest.mock import MagicMock
-from modules.database import vaga_ja_processada, salvar_vaga_base
+
+from modules.database import salvar_vaga_base, vaga_ja_processada
+
 
 def test_vaga_ja_processada_true(mocker):
     mock_supabase = MagicMock()
