@@ -259,9 +259,11 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
             import json
             with open("master_profile.json", "r", encoding="utf-8") as f:
                 mp = json.load(f)
-                perfil = f"Objetivo: {mp.get('objetivo_profissional', 'Dev')}, Senioridade alvo: Pleno/Sênior, Local: {mp.get('preferencias_vaga', {}).get('modelo_trabalho', 'Remoto')}."
+                niveis = mp.get("preferencias_vaga", {}).get("niveis_experiencia", ["Junior"])
+                niveis_str = "/".join(niveis) if niveis else "Junior"
+                perfil = f"Objetivo: {mp.get('objetivo_profissional', 'Desenvolvedor')}, Senioridade alvo: {niveis_str}, Local: {mp.get('preferencias_vaga', {}).get('modelo_trabalho', 'Remoto')}."
         except:
-            pass
+            perfil = "Objetivo: Desenvolvedor, Senioridade alvo: Junior, Local: Remoto."
 
         # 3. Puxa o detalhamento ampliado do Supabase
         detalhes_vagas = ""
@@ -312,6 +314,8 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
             "Você é especialista em engenharia de software, recrutamento e vagas de emprego. "
             "Sua missão é responder de forma direta, prestativa e amigável (como um chatbot no Telegram). "
             "Use emojis para deixar a conversa leve.\n\n"
+            "⚠️ REGRA CRÍTICA DE FORMATAÇÃO: O Telegram usa HTML, não Markdown. NUNCA use asteriscos (**) ou underscores (_) para formatação. "
+            "Para negrito, use <b>texto</b>. Para itálico, use <i>texto</i>. Para código, use <code>texto</code>.\n\n"
             f"**Perfil do Felipe**: {perfil}\n\n"
             f"**Resumo de Hoje**:\n{contexto_hoje}\n\n"
             f"**Contexto Completo do Banco de Dados**:\n{detalhes_vagas}\n\n"
