@@ -237,6 +237,40 @@ def extrair_texto_imagem_groq(image_path: str) -> str:
         except Exception: pass
         return ""
 
+def responder_como_ia(chat_id: str, texto_usuario: str):
+    """Chat inteligente usando a Groq para responder o usuário no Telegram."""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        enviar_mensagem_telegram(chat_id, "⚠️ A chave GROQ_API_KEY não está configurada para chat.")
+        return
+
+    enviar_mensagem_telegram(chat_id, "🤔 <i>Pensando...</i>")
+    try:
+        from groq import Groq
+        client = Groq(api_key=api_key)
+        
+        prompt_sistema = (
+            "Você é o Agente de Vagas, o assistente pessoal super inteligente do Felipe. "
+            "Você é especialista em engenharia de software, recrutamento e vagas de emprego. "
+            "Sua missão é responder de forma direta, prestativa e amigável (como um chatbot no Telegram). "
+            "Seja sucinto, não mande textos longos demais. Use emojis para deixar a conversa leve."
+        )
+        
+        response = client.chat.completions.create(
+            model="llama3-70b-8192",
+            messages=[
+                {"role": "system", "content": prompt_sistema},
+                {"role": "user", "content": texto_usuario}
+            ],
+            temperature=0.7,
+            max_tokens=1024
+        )
+        resposta = response.choices[0].message.content.strip()
+        enviar_mensagem_telegram(chat_id, resposta)
+    except Exception as e:
+        logger.error(f"[ERRO GROQ CHAT] {e}")
+        enviar_mensagem_telegram(chat_id, "❌ Ops! Minha IA falhou ao gerar a resposta. Tente novamente.")
+
 def resolver_texto_com_url(chat_id: str, texto: str) -> str:
     """Verifica se há um URL no texto (e se ele é a parte principal) e tenta raspar."""
     urls = re.findall(r'(https?://\S+)', texto)
@@ -688,11 +722,17 @@ Comandos disponíveis:
         else:
             enviar_mensagem_telegram(chat_id, "⚠️ Comando não reconhecido. Use /ajuda para ver os comandos ou envie a descrição da vaga diretamente.")
     else:
-        if len(text) >= 15:
+        # Se for um texto longo e parecer uma vaga (tem keywords de vaga), ele processa como vaga
+        texto_lower = text.lower()
+        keywords_vaga = ["requisitos", "experiência", "habilidades", "salário", "benefícios", "contratação", "requirements", "experience", "vaga", "sênior", "pleno", "junior", "clt", "pj"]
+        matches = sum(1 for kw in keywords_vaga if kw in texto_lower)
+        
+        if len(text) >= 80 and matches >= 2:
             text = resolver_texto_com_url(chat_id, text)
             threading.Thread(target=processar_vaga_direta, args=(chat_id, text), daemon=True).start()
         else:
-            enviar_mensagem_telegram(chat_id, "ℹ️ Para analisar uma vaga, envie a descrição completa da vaga nesta conversa ou use o comando <code>/vaga &lt;descrição&gt;</code>.")
+            # Caso contrário, age como uma IA conversacional (ChatGPT) e responde à pergunta
+            threading.Thread(target=responder_como_ia, args=(chat_id, text), daemon=True).start()
 
 def escutar_comandos():
     """Inicia o loop de escuta de comandos do Telegram via Long Polling ininterrupto (Anti-Sleep)."""
