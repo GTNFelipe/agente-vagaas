@@ -16,7 +16,7 @@ def realizar_candidatura_auto_email(vaga_info: dict[str, Any], analise_ia: dict[
     Envia o e-mail de candidatura DIRETO para o recrutador e envia uma CÓPIA para o candidato.
     """
     if not isinstance(vaga_info, dict) or not isinstance(analise_ia, dict):
-        raise ValueError("[FAIL FAST] Dicionarios passados para realizar_candidatura_auto_email sao invalidos.")
+        raise TypeError("[FAIL FAST] Dicionarios passados para realizar_candidatura_auto_email sao invalidos.")
     remetente = os.getenv("GMAIL_USER")
     senha_app = os.getenv("GMAIL_APP_PASSWORD")
     email_recrutador = vaga_info.get("email_candidatura")
@@ -106,7 +106,7 @@ def enviar_notificacao_telegram(vaga_info: dict[str, Any], analise_ia: dict[str,
     Dispara notificações ricas e exclusivas com botões inline diretamente para o Telegram do usuário.
     """
     if not isinstance(vaga_info, dict) or not isinstance(analise_ia, dict):
-        raise ValueError("[FAIL FAST] Dicionarios passados para enviar_notificacao_telegram sao invalidos.")
+        raise TypeError("[FAIL FAST] Dicionarios passados para enviar_notificacao_telegram sao invalidos.")
         
     token: str | None = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
@@ -156,7 +156,7 @@ def enviar_notificacao_telegram(vaga_info: dict[str, Any], analise_ia: dict[str,
         "disable_web_page_preview": False
     }
 
-    if link_vaga and (link_vaga.startswith("http://") or link_vaga.startswith("https://")):
+    if link_vaga and (link_vaga.startswith(("http://", "https://"))):
         payload["reply_markup"] = {
             "inline_keyboard": [
                 [{"text": "🔗 Abrir Anúncio da Vaga", "url": link_vaga}]

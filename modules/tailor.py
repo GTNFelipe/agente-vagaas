@@ -173,7 +173,7 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict[str, Any]) -> dict[
 
                 return resultado
 
-            except RateLimitError as e:
+            except RateLimitError:
                 if modelo_atual != modelos_para_testar[-1]:
                     logger.warning(f"⚠️ Rate limit no modelo '{modelo_atual}'. Tentando modelo alternativo...")
                     continue
@@ -184,7 +184,7 @@ def adaptar_curriculo(descricao_vaga: str, perfil_json: dict[str, Any]) -> dict[
                     time.sleep(tempo_espera)
                     tempo_espera += 10
                 else:
-                    raise e
+                    raise
             except Exception as e:
                 err_str: str = str(e).lower()
                 if any(err_key in err_str for err_key in ["model_not_found", "model_decommissioned", "does not exist", "404", "413", "request_too_large", "entity too large"]):

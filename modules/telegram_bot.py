@@ -234,7 +234,7 @@ def extrair_texto_imagem_groq(image_path: str) -> str:
                 f.write(f"ERRO GROQ: {e}\n")
                 if hasattr(e, 'response'):
                     f.write(f"API DETAILS: {e.response.json()}\n")
-        except: pass
+        except Exception: pass
         return ""
 
 def resolver_texto_com_url(chat_id: str, texto: str) -> str:
@@ -412,7 +412,7 @@ def processar_vaga_direta(chat_id: str, texto_vaga: str):
         lines = [l.strip() for l in texto_vaga.split("\n") if l.strip()]
         for line in lines[:5]:
             l_lower = line.lower()
-            if l_lower.startswith("vaga:") or l_lower.startswith("cargo:") or l_lower.startswith("título:") or l_lower.startswith("titulo:"):
+            if l_lower.startswith(("vaga:", "cargo:", "título:", "titulo:")):
                 titulo = line.split(":", 1)[1].strip()
             elif l_lower.startswith("empresa:"):
                 empresa = line.split(":", 1)[1].strip()

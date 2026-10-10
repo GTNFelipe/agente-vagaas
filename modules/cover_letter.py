@@ -11,7 +11,7 @@ def gerar_arquivo_carta_apresentacao(vaga_info: dict[str, Any], analise_ia: dict
     Gera um arquivo formatado (.txt / .md) da Carta de Apresentação de Alto Impacto para a vaga.
     """
     if not isinstance(vaga_info, dict) or not isinstance(analise_ia, dict) or not isinstance(perfil_base, dict):
-        raise ValueError("[FAIL FAST] Um ou mais dicionarios passados para gerar_arquivo_carta_apresentacao sao invalidos.")
+        raise TypeError("[FAIL FAST] Um ou mais dicionarios passados para gerar_arquivo_carta_apresentacao sao invalidos.")
     os.makedirs(output_dir, exist_ok=True)
 
     titulo = vaga_info.get("titulo", "Vaga_Desconhecida")

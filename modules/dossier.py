@@ -12,7 +12,7 @@ def gerar_dossie_vaga(vaga_info: dict[str, Any], analise_ia: dict[str, Any], out
     com base nas análises e insights da IA sobre a vaga.
     """
     if not isinstance(vaga_info, dict) or not isinstance(analise_ia, dict):
-        raise ValueError("[FAIL FAST] Dicionarios passados para gerar_dossie_vaga sao invalidos.")
+        raise TypeError("[FAIL FAST] Dicionarios passados para gerar_dossie_vaga sao invalidos.")
     os.makedirs(output_dir, exist_ok=True)
 
     titulo = vaga_info.get("titulo", "Vaga_Desconhecida")

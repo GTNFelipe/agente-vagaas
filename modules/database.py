@@ -38,7 +38,7 @@ def inicializar_supabase() -> Client | None:
     url = raw_url.strip().strip('"').strip("'")
     key = raw_key.strip().strip('"').strip("'")
 
-    if url and not (url.startswith("http://") or url.startswith("https://")):
+    if url and not (url.startswith(("http://", "https://"))):
         url = f"https://{url}"
 
     if not url or not key or create_client is None:
@@ -57,7 +57,7 @@ def _carregar_vagas_locais() -> list[dict[str, Any]]:
             with open(LOCAL_DB_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if not isinstance(data, list):
-                    raise ValueError("Conteudo local nao e uma lista.")
+                    raise TypeError("Conteudo local nao e uma lista.")
                 return data
         except Exception as e:
             logger.warning(f"Erro ao carregar cache local de vagas: {e}")
@@ -66,7 +66,7 @@ def _carregar_vagas_locais() -> list[dict[str, Any]]:
 
 def _salvar_vagas_locais(vagas: list[dict[str, Any]]) -> None:
     if not isinstance(vagas, list):
-        raise ValueError("[FAIL FAST] A variavel vagas deve ser uma lista.")
+        raise TypeError("[FAIL FAST] A variavel vagas deve ser uma lista.")
     try:
         with open(LOCAL_DB_FILE, "w", encoding="utf-8") as f:
             json.dump(vagas, f, ensure_ascii=False, indent=2)
