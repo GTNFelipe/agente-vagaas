@@ -1,6 +1,10 @@
 import os
 import smtplib
-from datetime import UTC
+try:
+    from datetime import UTC
+except ImportError:
+    from datetime import timezone
+    UTC = timezone.utc
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any

@@ -77,7 +77,11 @@ if os.path.exists(ENV_FILE):
 else:
     load_dotenv()
 
-from datetime import UTC
+try:
+    from datetime import UTC
+except ImportError:
+    from datetime import timezone
+    UTC = timezone.utc
 
 import main
 from modules.cover_letter import gerar_arquivo_carta_apresentacao
@@ -98,7 +102,7 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 def enviar_mensagem_telegram(chat_id: str, texto: str) -> None:
-    """Envia mensagem formatada em HTML para o chat do Telegram."""
+    """Envia mensagem formatada em HTML para o chat do Telegram com fallback para texto puro."""
     if not isinstance(chat_id, str) or not isinstance(texto, str):
         logger.warning("[FAIL FAST] chat_id e texto devem ser strings válidas.")
         return
@@ -114,7 +118,13 @@ def enviar_mensagem_telegram(chat_id: str, texto: str) -> None:
         "disable_web_page_preview": True
     }
     try:
-        requests.post(url, json=payload, timeout=10)
+        resp = requests.post(url, json=payload, timeout=10)
+        if resp.status_code != 200:
+            resp_data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+            desc = resp_data.get("description", resp.text)
+            if "parse" in desc.lower() or "entity" in desc.lower() or "tag" in desc.lower():
+                payload.pop("parse_mode", None)
+                requests.post(url, json=payload, timeout=10)
     except Exception as e:
         logger.warning("[ERRO TELEGRAM] Falha ao enviar mensagem: %s", e)
 
@@ -157,23 +167,28 @@ def consultar_uso_serpapi() -> dict[str, Any]:
         return {}
 
 def extrair_texto_url(url: str) -> str:
-    """Extrai o texto visível de uma URL utilizando BeautifulSoup."""
+    """Extrai o texto visível de uma URL utilizando BeautifulSoup com headers realistas de navegador."""
     if not url or not isinstance(url, str):
-        raise ValueError("[FAIL FAST] URL fornecida para extração de texto é inválida.")
+        return ""
         
     try:
         headers: dict[str, str] = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
         }
-        resp: requests.Response = requests.get(url, headers=headers, timeout=15)
+        resp: requests.Response = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.content, "html.parser")
-            for script in soup(["script", "style"]):
+            for script in soup(["script", "style", "nav", "footer", "noscript"]):
                 script.decompose()
             text: str = soup.get_text(separator="\n", strip=True)
             return text
     except Exception as e:
-        logger.warning("[ERRO EXTRAIR URL] %s", e)
+        logger.warning("[ERRO EXTRAIR URL] %s: %s", url, e)
     return ""
 
 def extrair_texto_imagem_groq(image_path: str) -> str:
@@ -188,20 +203,16 @@ def extrair_texto_imagem_groq(image_path: str) -> str:
         client = Groq(api_key=api_key)
         
         import io
-
         from PIL import Image
         
         # Otimizar a imagem para evitar limites de resolução da API Groq
         with Image.open(image_path) as img:
-            # Converter para RGB se for RGBA (PNG com transparência)
             if img.mode == 'RGBA':
                 img = img.convert('RGB')
                 
-            # Limite seguro para APIs de visão (geralmente 1024x1024 ou similar)
             max_size = (1024, 1024)
             img.thumbnail(max_size, Image.Resampling.LANCZOS)
             
-            # Salvar em buffer de memória como JPEG
             buffer = io.BytesIO()
             img.save(buffer, format="JPEG", quality=85)
             base64_image = base64.b64encode(buffer.getvalue()).decode('utf-8')
@@ -224,7 +235,8 @@ def extrair_texto_imagem_groq(image_path: str) -> str:
                     ]
                 }
             ],
-            temperature=0.1
+            temperature=0.1,
+            max_tokens=600
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
@@ -238,7 +250,7 @@ def extrair_texto_imagem_groq(image_path: str) -> str:
         return ""
 
 def responder_como_ia(chat_id: str, texto_usuario: str):
-    """Chat inteligente usando a Groq para responder o usuário no Telegram."""
+    """Chat inteligente usando a Groq com pool de modelos e fallback automático para responder o usuário no Telegram."""
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         enviar_mensagem_telegram(chat_id, "⚠️ A chave GROQ_API_KEY não está configurada para chat.")
@@ -246,8 +258,8 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
 
     enviar_mensagem_telegram(chat_id, "🤔 <i>Pensando...</i>")
     try:
-        from modules.database import inicializar_supabase
         from datetime import datetime, timedelta, timezone
+        from modules.database import inicializar_supabase
         supabase = inicializar_supabase()
         
         # 1. Puxa o status real do dia
@@ -262,7 +274,7 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
                 niveis = mp.get("preferencias_vaga", {}).get("niveis_experiencia", ["Junior"])
                 niveis_str = "/".join(niveis) if niveis else "Junior"
                 perfil = f"Objetivo: {mp.get('objetivo_profissional', 'Desenvolvedor')}, Senioridade alvo: {niveis_str}, Local: {mp.get('preferencias_vaga', {}).get('modelo_trabalho', 'Remoto')}."
-        except:
+        except Exception:
             perfil = "Objetivo: Desenvolvedor, Senioridade alvo: Junior, Local: Remoto."
 
         # 3. Puxa o detalhamento ampliado do Supabase
@@ -327,34 +339,113 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
             "Instruções: Se o usuário perguntar sobre vagas, use o contexto acima para responder. Se ele perguntar algo que não está aí, seja honesto. Se ele fizer perguntas técnicas, responda normalmente."
         )
         
-        response = client.chat.completions.create(
-            model="qwen/qwen3.8-27b",
-            messages=[
-                {"role": "system", "content": prompt_sistema},
-                {"role": "user", "content": texto_usuario}
-            ],
-            temperature=0.7,
-            max_tokens=1024
-        )
-        resposta = response.choices[0].message.content.strip()
-        enviar_mensagem_telegram(chat_id, resposta)
+        modelos_chat = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
+        resposta = None
+        ultimo_erro = None
+
+        for modelo in modelos_chat:
+            try:
+                response = client.chat.completions.create(
+                    model=modelo,
+                    messages=[
+                        {"role": "system", "content": prompt_sistema},
+                        {"role": "user", "content": texto_usuario}
+                    ],
+                    temperature=0.7,
+                    max_tokens=600
+                )
+                resposta = response.choices[0].message.content.strip()
+                if resposta:
+                    break
+            except Exception as model_err:
+                ultimo_erro = model_err
+                logger.warning("[IA CHAT] Falha no modelo %s: %s. Tentando fallback...", modelo, model_err)
+                continue
+
+        if resposta:
+            enviar_mensagem_telegram(chat_id, resposta)
+        else:
+            raise ultimo_erro or Exception("Nenhum modelo da Groq respondeu.")
     except Exception as e:
         logger.error(f"[ERRO GROQ CHAT] {e}")
         enviar_mensagem_telegram(chat_id, "❌ Ops! Minha IA falhou ao gerar a resposta. Tente novamente.")
 
+def eh_conteudo_vaga(texto: str, url: str = "") -> bool:
+    """Verifica se um texto ou URL corresponde a uma vaga de emprego."""
+    if url:
+        dominios_vagas = [
+            "linkedin.com", "lnkd.in", "gupy.io", "greenhouse.io", "lever.co",
+            "vagas.com", "indeed.com", "catho.com", "infojobs.com", "glassdoor.com",
+            "trampos.co", "programathor.com", "workana.com", "remotar.com",
+            "remotamente.com.br", "kenoby.com"
+        ]
+        if any(dom in url.lower() for dom in dominios_vagas):
+            return True
+
+    keywords_vaga = [
+        "vaga", "requisitos", "experiência", "experiencia", "habilidades", "salário",
+        "salario", "benefícios", "beneficios", "contratação", "contratacao",
+        "requirements", "experience", "sênior", "senior", "pleno", "junior", "júnior",
+        "clt", "pj", "responsabilidades", "qualificações", "qualificacoes", "atividades",
+        "candidatar", "job", "developer", "desenvolvedor", "desenvolvedora", "engenheiro",
+        "engenheira", "analista", "full stack", "fullstack", "backend", "frontend",
+        "estamos buscando", "oportunidade"
+    ]
+    texto_lower = texto.lower()
+    matches = sum(1 for kw in keywords_vaga if kw in texto_lower)
+    return matches >= 2
+
+def tratar_entrada_usuario(chat_id: str, texto: str, forcar_vaga: bool = False):
+    """
+    Roteador inteligente:
+    - Se encontrar URL (especialmente de LinkedIn/recrutamento), acessa a página e extrai a vaga.
+    - Se for detectada uma vaga (por URL ou texto com termos de emprego), processa a vaga (CV, Dossiê, Carta, Auto-Apply).
+    - Caso contrário, atua como IA conversacional prestativa.
+    """
+    urls = re.findall(r'(https?://[^\s]+)', texto)
+    if urls:
+        url_alvo = urls[0].rstrip(".,;)>]")
+        enviar_mensagem_telegram(chat_id, "🔗 <b>[LINK DETECTADO]</b> Acessando o link para ler o conteúdo...")
+        conteudo_raspado = extrair_texto_url(url_alvo)
+
+        if not conteudo_raspado:
+            enviar_mensagem_telegram(
+                chat_id,
+                "⚠️ Não foi possível extrair o texto diretamente deste link (alguns sites exigem login ou bloqueiam bots).\n\n"
+                "💡 <b>Como resolver:</b>\n"
+                "1. Copie e cole o texto da vaga diretamente aqui na conversa; OU\n"
+                "2. Envie um print (screenshot) da vaga que minha IA lê o texto e gera seu currículo na hora!"
+            )
+            if forcar_vaga:
+                return
+            responder_como_ia(chat_id, texto)
+            return
+
+        # Verifica se o link/conteúdo raspado é uma vaga
+        if forcar_vaga or eh_conteudo_vaga(conteudo_raspado, url=url_alvo):
+            texto_extra = texto.replace(url_alvo, "").strip()
+            texto_final = f"{texto_extra}\n\n[CONTEÚDO DO LINK]:\n{conteudo_raspado}".strip() if texto_extra else conteudo_raspado
+            processar_vaga_direta(chat_id, texto_final, url_origem=url_alvo)
+        else:
+            # Não é vaga: responde usando o conteúdo da página como contexto
+            responder_como_ia(chat_id, f"{texto}\n\n[CONTEÚDO DA PÁGINA]:\n{conteudo_raspado[:2500]}")
+        return
+
+    # Mensagem de texto sem link
+    if forcar_vaga or (len(texto) >= 80 and eh_conteudo_vaga(texto)):
+        processar_vaga_direta(chat_id, texto, url_origem="")
+    else:
+        responder_como_ia(chat_id, texto)
+
 def resolver_texto_com_url(chat_id: str, texto: str) -> str:
-    """Verifica se há um URL no texto (e se ele é a parte principal) e tenta raspar."""
+    """Verifica se há um URL no texto e tenta raspar (mantido para compatibilidade)."""
     urls = re.findall(r'(https?://\S+)', texto)
     if urls:
-        url = urls[0]
-        texto_sem_url = texto.replace(url, "").strip()
-        if len(texto_sem_url) < 100:
-            enviar_mensagem_telegram(chat_id, "🔗 <b>[LINK DETECTADO]</b> Acessando a página para ler a descrição da vaga...")
-            conteudo = extrair_texto_url(url)
-            if conteudo:
-                return f"{texto_sem_url}\n\n[CONTEÚDO DO SITE]:\n{conteudo}".strip()
-            else:
-                enviar_mensagem_telegram(chat_id, "⚠️ Não foi possível extrair texto do link. Prosseguindo com o texto original.")
+        url = urls[0].rstrip(".,;)>]")
+        conteudo = extrair_texto_url(url)
+        if conteudo:
+            texto_sem_url = texto.replace(url, "").strip()
+            return f"{texto_sem_url}\n\n[CONTEÚDO DO SITE]:\n{conteudo}".strip()
     return texto
 
 def comando_status() -> str:
@@ -496,7 +587,7 @@ def gerar_relatorio_diario_telegram(automatico: bool = False) -> str:
 {rodape}"""
     return mensagem
 
-def processar_vaga_direta(chat_id: str, texto_vaga: str):
+def processar_vaga_direta(chat_id: str, texto_vaga: str, url_origem: str = ""):
     """
     Processa a descrição de uma vaga enviada diretamente pelo usuário no Telegram.
     Gera e envia o Currículo Otimizado (PDF), Dossiê de Entrevista (MD) e Carta de Apresentação (TXT).
@@ -515,7 +606,7 @@ def processar_vaga_direta(chat_id: str, texto_vaga: str):
         empresa = "Empresa via Telegram"
 
         lines = [l.strip() for l in texto_vaga.split("\n") if l.strip()]
-        for line in lines[:5]:
+        for line in lines[:15]:
             l_lower = line.lower()
             if l_lower.startswith(("vaga:", "cargo:", "título:", "titulo:")):
                 titulo = line.split(":", 1)[1].strip()
@@ -523,9 +614,13 @@ def processar_vaga_direta(chat_id: str, texto_vaga: str):
                 empresa = line.split(":", 1)[1].strip()
 
         if titulo == "Vaga Solicitada via Telegram" and lines:
-            primeira_linha = lines[0]
-            if len(primeira_linha) <= 60 and not primeira_linha.lower().startswith("descriç"):
-                titulo = primeira_linha
+            for line in lines[:8]:
+                clean_line = line.strip()
+                if (clean_line.startswith("[") and clean_line.endswith("]:")) or clean_line.startswith("🔗"):
+                    continue
+                if 5 <= len(clean_line) <= 75 and not clean_line.lower().startswith(("descriç", "agree", "sign in", "skip to", "como se candid")):
+                    titulo = clean_line
+                    break
 
         analise = adaptar_curriculo(texto_vaga, perfil_base)
         match_score = analise.get("match_score", 0)
@@ -541,7 +636,7 @@ def processar_vaga_direta(chat_id: str, texto_vaga: str):
         vaga_info = {
             "titulo": titulo,
             "empresa": empresa,
-            "link": "",
+            "link": url_origem or "",
             "descricao": texto_vaga
         }
 
@@ -728,8 +823,7 @@ def processar_mensagem(update: dict):
                     if texto_extraido:
                         enviar_mensagem_telegram(chat_id, "✅ <b>[LEITURA CONCLUÍDA]</b> Texto extraído com sucesso! Processando a vaga...")
                         texto_final = f"{caption}\n\n[TEXTO DA IMAGEM]:\n{texto_extraido}".strip()
-                        texto_final = resolver_texto_com_url(chat_id, texto_final)
-                        threading.Thread(target=processar_vaga_direta, args=(chat_id, texto_final), daemon=True).start()
+                        threading.Thread(target=tratar_entrada_usuario, args=(chat_id, texto_final, True), daemon=True).start()
                         return
                     else:
                         enviar_mensagem_telegram(chat_id, "⚠️ Não consegui extrair texto claro dessa imagem.")
@@ -763,10 +857,10 @@ Comandos disponíveis:
 📅 /relatorio - Exibe o resumo de desempenho do dia de hoje (Daily Digest).
 📋 /historico ou /vagas - Lista todas as vagas qualificadas já encontradas.
 ⚡ /buscar - Dispara uma busca de vagas na web imediatamente.
-💼 /vaga &lt;descrição&gt; - Analisa uma vaga enviada via texto e gera CV, Dossiê e Carta.
+💼 /vaga &lt;link ou texto&gt; - Analisa uma vaga e gera CV, Dossiê e Carta.
 ❓ /ajuda - Exibe este menu de ajuda.
 
-💡 <b>Dica:</b> Você também pode colar a descrição completa de uma vaga diretamente nesta conversa para receber o Currículo, Dossiê e Carta instantaneamente!"""
+💡 <b>Dica:</b> Você pode enviar diretamente o link do LinkedIn (ou de qualquer outro site de vagas) ou colar a descrição completa da vaga nesta conversa para receber o Currículo, Dossiê e Carta instantaneamente!"""
             enviar_mensagem_telegram(chat_id, ajuda_texto)
 
         elif cmd == "/status":
@@ -785,25 +879,14 @@ Comandos disponíveis:
 
         elif cmd in ["/vaga", "/analisar"]:
             if len(partes) > 1 and partes[1].strip():
-                texto_vaga = partes[1].strip()
-                texto_vaga = resolver_texto_com_url(chat_id, texto_vaga)
-                threading.Thread(target=processar_vaga_direta, args=(chat_id, texto_vaga), daemon=True).start()
+                conteudo_param = partes[1].strip()
+                threading.Thread(target=tratar_entrada_usuario, args=(chat_id, conteudo_param, True), daemon=True).start()
             else:
-                enviar_mensagem_telegram(chat_id, "⚠️ Por favor, envie a descrição da vaga após o comando.\nExemplo:\n<code>/vaga Desenvolvedor Python...</code>")
+                enviar_mensagem_telegram(chat_id, "⚠️ Por favor, envie o link ou a descrição da vaga após o comando.\nExemplo:\n<code>/vaga https://linkedin.com/...</code> ou <code>/vaga Desenvolvedor Python...</code>")
         else:
-            enviar_mensagem_telegram(chat_id, "⚠️ Comando não reconhecido. Use /ajuda para ver os comandos ou envie a descrição da vaga diretamente.")
+            enviar_mensagem_telegram(chat_id, "⚠️ Comando não reconhecido. Use /ajuda para ver os comandos ou envie a descrição ou link da vaga diretamente.")
     else:
-        # Se for um texto longo e parecer uma vaga (tem keywords de vaga), ele processa como vaga
-        texto_lower = text.lower()
-        keywords_vaga = ["requisitos", "experiência", "habilidades", "salário", "benefícios", "contratação", "requirements", "experience", "vaga", "sênior", "pleno", "junior", "clt", "pj"]
-        matches = sum(1 for kw in keywords_vaga if kw in texto_lower)
-        
-        if len(text) >= 80 and matches >= 2:
-            text = resolver_texto_com_url(chat_id, text)
-            threading.Thread(target=processar_vaga_direta, args=(chat_id, text), daemon=True).start()
-        else:
-            # Caso contrário, age como uma IA conversacional (ChatGPT) e responde à pergunta
-            threading.Thread(target=responder_como_ia, args=(chat_id, text), daemon=True).start()
+        threading.Thread(target=tratar_entrada_usuario, args=(chat_id, text, False), daemon=True).start()
 
 def escutar_comandos():
     """Inicia o loop de escuta de comandos do Telegram via Long Polling ininterrupto (Anti-Sleep)."""

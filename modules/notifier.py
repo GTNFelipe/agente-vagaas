@@ -165,6 +165,14 @@ def enviar_notificacao_telegram(vaga_info: dict[str, Any], analise_ia: dict[str,
 
     try:
         response = requests.post(url, json=payload, timeout=10)
+        if response.status_code != 200:
+            resp_data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+            desc = resp_data.get("description", response.text)
+            if "parse" in desc.lower() or "entity" in desc.lower() or "tag" in desc.lower():
+                logger.warning("[TELEGRAM] Falha ao enviar HTML ('%s'). Reenviando sem formatacao HTML como fallback...", desc)
+                payload.pop("parse_mode", None)
+                response = requests.post(url, json=payload, timeout=10)
+
         if response.status_code == 200:
             logger.info("[TELEGRAM] Notificacao enviada para o Telegram com sucesso!")
         else:
