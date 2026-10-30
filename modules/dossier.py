@@ -4,6 +4,8 @@ import re
 from datetime import datetime
 from typing import Any
 
+from modules.pdf_generator import sanitizar_texto_para_pdf
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 def gerar_dossie_vaga(vaga_info: dict[str, Any], analise_ia: dict[str, Any], output_dir: str = "dossies_vagas") -> str:
@@ -44,7 +46,7 @@ def gerar_dossie_vaga(vaga_info: dict[str, Any], analise_ia: dict[str, Any], out
 ---
 
 ## 🎙️ Pitch de Apresentação (1 Minuto)
-> "{pitch or 'Apresente sua trajetória destacando sua experiência prática em backend, COBOL/Mainframe, Java e automações n8n/IA Generativa.'}"
+> "{pitch or 'Apresente sua trajetória destacando sua experiência prática em software engineering, full-stack, backend e automações com IA.'}"
 
 ---
 
@@ -73,8 +75,10 @@ def gerar_dossie_vaga(vaga_info: dict[str, Any], analise_ia: dict[str, Any], out
     conteudo_md += "\n---\n\n## ✉️ Carta de Apresentação Gerada\n"
     conteudo_md += f"{analise_ia.get('cover_letter', '')}\n"
 
+    conteudo_sanitizado = sanitizar_texto_para_pdf(conteudo_md)
+
     with open(caminho_arquivo, "w", encoding="utf-8") as f:
-        f.write(conteudo_md)
+        f.write(conteudo_sanitizado)
 
     logger.info("[DOSSIÊ] Dossiê de entrevista gerado com sucesso: '%s'", caminho_arquivo)
     return caminho_arquivo

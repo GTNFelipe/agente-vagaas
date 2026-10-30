@@ -94,8 +94,8 @@ from modules.database import (
 )
 from modules.dossier import gerar_dossie_vaga
 from modules.notifier import enviar_notificacao_vaga, realizar_candidatura_auto_email
-from modules.pdf_generator import gerar_pdf_curriculo
-from modules.tailor import adaptar_curriculo
+from modules.pdf_generator import gerar_pdf_curriculo, sanitizar_texto_para_pdf
+from modules.tailor import adaptar_curriculo, obter_cliente_e_modelos, obter_provedores_ia
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -167,28 +167,185 @@ def consultar_uso_serpapi() -> dict[str, Any]:
         return {}
 
 def extrair_texto_url(url: str) -> str:
-    """Extrai o texto visível de uma URL utilizando BeautifulSoup com headers realistas de navegador."""
+    """
+    Extrator inteligente e robusto de conteúdo de vagas via URL:
+    - Suporta LinkedIn (incluindo links curtos lnkd.in, mobile e guest API oficial)
+    - Suporta Gupy (decodificação de links base64 e extração de dados do __NEXT_DATA__)
+    - Suporta Schema.org JSON-LD (JobPosting) presente em Indeed, Glassdoor, Catho, etc.
+    - Suporta plataformas de ATS (Greenhouse, Lever, Workable, Programathor)
+    - Fallback com limpeza de navegação, rodapé, banners de cookies e scripts.
+    """
     if not url or not isinstance(url, str):
         return ""
-        
+
+    url_alvo = url.strip().rstrip(".,;)>]")
+    if not url_alvo.startswith("http"):
+        url_alvo = "https://" + url_alvo
+
+    session = requests.Session()
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Upgrade-Insecure-Requests": "1"
+    }
+    session.headers.update(headers)
+
+    # 1. TRATAMENTO DEDICADO PARA LINKEDIN (INCLUINDO LNKD.IN)
+    if "linkedin.com" in url_alvo.lower() or "lnkd.in" in url_alvo.lower():
+        try:
+            resp_init = session.get(url_alvo, allow_redirects=True, timeout=12)
+            url_final = resp_init.url
+
+            job_id_match = (
+                re.search(r'/jobs/view/(?:[a-zA-Z0-9\-]+-)?(\d{8,12})', url_final)
+                or re.search(r'currentJobId=(\d{8,12})', url_final)
+                or re.search(r'(\d{8,12})', url_final)
+                or re.search(r'(\d{8,12})', url_alvo)
+            )
+
+            if job_id_match:
+                job_id = job_id_match.group(1)
+                guest_url = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
+                r_guest = session.get(guest_url, timeout=12)
+                if r_guest.status_code == 200 and len(r_guest.text) > 300:
+                    soup_li = BeautifulSoup(r_guest.text, 'html.parser')
+                    title_elem = soup_li.find('h2', class_='top-card-layout__title') or soup_li.find('h1')
+                    comp_elem = soup_li.find('a', class_='topcard__org-name-link') or soup_li.find('span', class_='topcard__flavor')
+                    loc_elem = soup_li.find('span', class_='topcard__flavor--bullet')
+                    desc_elem = soup_li.find('div', class_='show-more-less-html__markup') or soup_li.find('section', class_='show-more-less-html')
+
+                    titulo = title_elem.get_text(strip=True) if title_elem else "Vaga no LinkedIn"
+                    empresa = comp_elem.get_text(strip=True) if comp_elem else "Empresa no LinkedIn"
+                    loc = loc_elem.get_text(strip=True) if loc_elem else ""
+                    desc = desc_elem.get_text(separator="\n", strip=True) if desc_elem else ""
+
+                    criterios = [crit.get_text(separator=" ", strip=True) for crit in soup_li.find_all('li', class_='description__job-criteria-item')]
+                    crit_text = "\n".join(criterios)
+
+                    blocos = [f"Vaga: {titulo}", f"Empresa: {empresa}"]
+                    if loc:
+                        blocos.append(f"Localização: {loc}")
+                    if crit_text:
+                        blocos.append(f"\nCritérios da Vaga:\n{crit_text}")
+                    if desc:
+                        blocos.append(f"\nDescrição da Vaga:\n{desc}")
+
+                    texto_completo = "\n".join(blocos)
+                    return sanitizar_texto_para_pdf(texto_completo)
+        except Exception as e:
+            logger.warning("[EXTRATOR LINKEDIN] Falha ao raspar API pública do LinkedIn: %s", e)
+
+    # 2. TRATAMENTO DEDICADO PARA GUPY
+    if "gupy.io" in url_alvo.lower():
+        try:
+            resp_gupy = session.get(url_alvo, allow_redirects=True, timeout=12)
+            if resp_gupy.status_code == 200:
+                soup_g = BeautifulSoup(resp_gupy.text, 'html.parser')
+                next_data = soup_g.find('script', id='__NEXT_DATA__')
+                if next_data and next_data.string:
+                    import json as _json
+                    data = _json.loads(next_data.string)
+                    job = data.get('props', {}).get('pageProps', {}).get('job', {})
+                    if job:
+                        nome = job.get('name', '')
+                        empresa = job.get('careerPageName', '')
+                        if not empresa:
+                            sub_match = re.search(r'https?://([^.]+)\.gupy\.io', url_alvo)
+                            if sub_match:
+                                empresa = sub_match.group(1).capitalize()
+
+                        modalidade = job.get('workplaceType', '')
+                        cidade = job.get('city', '')
+                        estado = job.get('state', '')
+                        loc = f"{cidade}/{estado}".strip('/') if cidade or estado else ""
+
+                        def _limpar_html_bloco(html_content: str) -> str:
+                            if not html_content:
+                                return ""
+                            s_bloco = BeautifulSoup(html_content, 'html.parser')
+                            return s_bloco.get_text(separator="\n", strip=True)
+
+                        desc = _limpar_html_bloco(job.get('description', ''))
+                        resp_atrib = _limpar_html_bloco(job.get('responsibilities', ''))
+                        requisitos = _limpar_html_bloco(job.get('prerequisites', ''))
+                        adicionais = _limpar_html_bloco(job.get('additionalInformation', ''))
+
+                        blocos = [f"Vaga: {nome}", f"Empresa: {empresa}"]
+                        if modalidade or loc:
+                            blocos.append(f"Modalidade/Local: {modalidade} {loc}".strip())
+                        if desc:
+                            blocos.append(f"\nDescrição da Vaga:\n{desc}")
+                        if resp_atrib:
+                            blocos.append(f"\nResponsabilidades e Atribuições:\n{resp_atrib}")
+                        if requisitos:
+                            blocos.append(f"\nRequisitos e Qualificações:\n{requisitos}")
+                        if adicionais:
+                            blocos.append(f"\nInformações Adicionais:\n{adicionais}")
+
+                        return sanitizar_texto_para_pdf("\n".join(blocos))
+        except Exception as e:
+            logger.warning("[EXTRATOR GUPY] Falha ao extrair dados Next.js da Gupy: %s", e)
+
+    # 3. TRATAMENTO GENÉRICO (JSON-LD SCHEMA.ORG JOBPOSTING E SELETORES ATS)
     try:
-        headers: dict[str, str] = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-        }
-        resp: requests.Response = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
+        resp = session.get(url_alvo, allow_redirects=True, timeout=15)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.content, "html.parser")
-            for script in soup(["script", "style", "nav", "footer", "noscript"]):
-                script.decompose()
-            text: str = soup.get_text(separator="\n", strip=True)
-            return text
+
+            # Tenta extrair Schema.org JobPosting em JSON-LD
+            for script_ld in soup.find_all('script', type='application/ld+json'):
+                try:
+                    if not script_ld.string:
+                        continue
+                    import json as _json
+                    ld_data = _json.loads(script_ld.string)
+                    itens_ld = ld_data if isinstance(ld_data, list) else [ld_data]
+                    for item in itens_ld:
+                        if isinstance(item, dict) and item.get('@type') in ['JobPosting', 'jobPosting']:
+                            t_vaga = item.get('title', '')
+                            h_org = item.get('hiringOrganization', {})
+                            e_vaga = h_org.get('name', '') if isinstance(h_org, dict) else str(h_org)
+                            d_vaga_html = item.get('description', '')
+                            d_clean = BeautifulSoup(d_vaga_html, 'html.parser').get_text(separator="\n", strip=True)
+
+                            blocos = []
+                            if t_vaga:
+                                blocos.append(f"Vaga: {t_vaga}")
+                            if e_vaga:
+                                blocos.append(f"Empresa: {e_vaga}")
+                            if d_clean:
+                                blocos.append(f"\nDescrição da Vaga:\n{d_clean}")
+
+                            res_ld = "\n".join(blocos)
+                            if len(res_ld) > 120:
+                                return sanitizar_texto_para_pdf(res_ld)
+                except Exception:
+                    pass
+
+            # Remove tags irrelevantes de layout
+            for tag in soup(["script", "style", "nav", "footer", "header", "noscript", "svg", "iframe", "aside"]):
+                tag.decompose()
+
+            # Procura container principal da vaga
+            seletor_principal = (
+                soup.find('main')
+                or soup.find('article')
+                or soup.find(class_=re.compile(r'(job[-_]?description|vaga[-_]?detalhe|posting[-_]?content|job[-_]?detail)', re.I))
+                or soup.find(id=re.compile(r'(job[-_]?description|vaga|content)', re.I))
+                or soup.body
+            )
+
+            if seletor_principal:
+                texto_extraido = seletor_principal.get_text(separator="\n", strip=True)
+                if len(texto_extraido) > 80:
+                    return sanitizar_texto_para_pdf(texto_extraido)
     except Exception as e:
-        logger.warning("[ERRO EXTRAIR URL] %s: %s", url, e)
+        logger.warning("[EXTRATOR URL GENERICO] %s: %s", url_alvo, e)
+
     return ""
 
 def extrair_texto_imagem_groq(image_path: str) -> str:
@@ -199,8 +356,11 @@ def extrair_texto_imagem_groq(image_path: str) -> str:
         return ""
     
     try:
-        from groq import Groq
-        client = Groq(api_key=api_key)
+        client, modelos_chat = obter_cliente_e_modelos()
+        if not client or not modelos_chat:
+            from groq import Groq
+            client = Groq(api_key=api_key)
+            modelos_chat = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]
         
         import io
         from PIL import Image
@@ -238,7 +398,7 @@ def extrair_texto_imagem_groq(image_path: str) -> str:
             temperature=0.1,
             max_tokens=600
         )
-        return response.choices[0].message.content.strip()
+        return sanitizar_texto_para_pdf(response.choices[0].message.content.strip())
     except Exception as e:
         logger.error(f"[ERRO OCR GROQ] Falha ao processar imagem: {e}")
         try:
@@ -251,9 +411,9 @@ def extrair_texto_imagem_groq(image_path: str) -> str:
 
 def responder_como_ia(chat_id: str, texto_usuario: str):
     """Chat inteligente usando a Groq com pool de modelos e fallback automático para responder o usuário no Telegram."""
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        enviar_mensagem_telegram(chat_id, "⚠️ A chave GROQ_API_KEY não está configurada para chat.")
+    provedores = obter_provedores_ia()
+    if not provedores:
+        enviar_mensagem_telegram(chat_id, "⚠️ Nenhuma chave de IA (GEMINI_API_KEY ou GROQ_API_KEY) configurada para chat.")
         return
 
     enviar_mensagem_telegram(chat_id, "🤔 <i>Pensando...</i>")
@@ -318,9 +478,6 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
         else:
             detalhes_vagas += "\n(Supabase offline)"
 
-        from groq import Groq
-        client = Groq(api_key=api_key)
-        
         prompt_sistema = (
             "Você é o Agente de Vagas, o assistente pessoal super inteligente do Felipe. "
             "Você é especialista em engenharia de software, recrutamento e vagas de emprego. "
@@ -339,14 +496,13 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
             "Instruções: Se o usuário perguntar sobre vagas, use o contexto acima para responder. Se ele perguntar algo que não está aí, seja honesto. Se ele fizer perguntas técnicas, responda normalmente."
         )
         
-        modelos_chat = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
         resposta = None
         ultimo_erro = None
 
-        for modelo in modelos_chat:
+        for client_atual, modelo_atual, nome_provedor in provedores:
             try:
-                response = client.chat.completions.create(
-                    model=modelo,
+                response = client_atual.chat.completions.create(
+                    model=modelo_atual,
                     messages=[
                         {"role": "system", "content": prompt_sistema},
                         {"role": "user", "content": texto_usuario}
@@ -356,18 +512,19 @@ def responder_como_ia(chat_id: str, texto_usuario: str):
                 )
                 resposta = response.choices[0].message.content.strip()
                 if resposta:
+                    resposta = sanitizar_texto_para_pdf(resposta)
                     break
             except Exception as model_err:
                 ultimo_erro = model_err
-                logger.warning("[IA CHAT] Falha no modelo %s: %s. Tentando fallback...", modelo, model_err)
+                logger.warning("[IA CHAT] Falha no modelo %s (%s): %s. Tentando fallback...", modelo_atual, nome_provedor, model_err)
                 continue
 
         if resposta:
             enviar_mensagem_telegram(chat_id, resposta)
         else:
-            raise ultimo_erro or Exception("Nenhum modelo da Groq respondeu.")
+            raise ultimo_erro or Exception("Nenhum modelo de IA respondeu.")
     except Exception as e:
-        logger.error(f"[ERRO GROQ CHAT] {e}")
+        logger.error(f"[ERRO IA CHAT] {e}")
         enviar_mensagem_telegram(chat_id, "❌ Ops! Minha IA falhou ao gerar a resposta. Tente novamente.")
 
 def eh_conteudo_vaga(texto: str, url: str = "") -> bool:

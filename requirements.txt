@@ -1,4 +1,5 @@
 groq
+openai
 supabase
 reportlab
 python-dotenv

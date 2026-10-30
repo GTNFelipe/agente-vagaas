@@ -4,6 +4,8 @@ import re
 from datetime import datetime
 from typing import Any
 
+from modules.pdf_generator import sanitizar_texto_para_pdf
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 def gerar_arquivo_carta_apresentacao(vaga_info: dict[str, Any], analise_ia: dict[str, Any], perfil_base: dict[str, Any], output_dir: str = "cartas_apresentacao") -> str:
@@ -59,12 +61,14 @@ LinkedIn: {linkedin} | GitHub: {github}
 
 Atenciosamente,
 {nome}
-{perfil_base.get('cargo_atual', 'Trainee TI / Desenvolvedor Backend')}
+{perfil_base.get('cargo_atual', 'Software Engineer')}
 {email} | {phone}
 """
 
+    conteudo_sanitizado = sanitizar_texto_para_pdf(conteudo_completo)
+
     with open(caminho_arquivo, "w", encoding="utf-8") as f:
-        f.write(conteudo_completo)
+        f.write(conteudo_sanitizado)
 
     logger.info("[CARTA] Carta de Apresentação salva em: '%s'", caminho_arquivo)
     return caminho_arquivo

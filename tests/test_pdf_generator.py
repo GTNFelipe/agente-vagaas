@@ -1,6 +1,16 @@
 import os
+from modules.pdf_generator import gerar_pdf_curriculo, sanitizar_texto_para_pdf
 
-from modules.pdf_generator import gerar_pdf_curriculo
+
+def test_sanitizar_texto_para_pdf():
+    # Testa o caractere \u2011 (non-breaking hyphen) que gerava o 'full■stack'
+    texto_problematico = "Engenheiro de Software full\u2011stack usando React\u202f19 e 30\u202f% de efici\u00eancia."
+    texto_limpo = sanitizar_texto_para_pdf(texto_problematico)
+    
+    assert "\u2011" not in texto_limpo
+    assert "\u202f" not in texto_limpo
+    assert "full-stack" in texto_limpo
+    assert "React 19" in texto_limpo
 
 
 def test_gerar_pdf_curriculo(tmp_path):
@@ -11,12 +21,12 @@ def test_gerar_pdf_curriculo(tmp_path):
         "contato": {"email": "joao@example.com", "phone": "11999999999", "linkedin": "linkedin.com/in/joao"},
         "resumo_profissional": "Desenvolvedor experiente.",
         "habilidades_tecnicas": {"linguagens": ["Python", "JavaScript"]},
-        "experiencias": [{"cargo": "Dev", "empresa": "Tech", "periodo": "2020-2022", "detalhes": ["Fez coisas."]}],
+        "experiencias": [{"cargo": "Dev", "empresa": "Tech", "periodo": "2020-2022", "detalhes": ["Fez coisas full\u2011stack."]}],
         "formacao": [{"curso": "Ciência da Computação", "instituicao": "USP", "conclusao": "2019"}]
     }
     analise_ia = {
-        "resumo_adaptado": "Desenvolvedor focado em Python.",
-        "habilidades_destacadas": ["Python"]
+        "resumo_adaptado": "Desenvolvedor focado em Python e full\u2011stack com React\u202f19.",
+        "habilidades_destacadas": ["Python", "full\u2011stack"]
     }
     
     output_file = tmp_path / "test_curriculo.pdf"
@@ -24,3 +34,4 @@ def test_gerar_pdf_curriculo(tmp_path):
     
     assert result == str(output_file)
     assert os.path.exists(result)
+    assert os.path.getsize(result) > 500
